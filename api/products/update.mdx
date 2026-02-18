@@ -1,0 +1,372 @@
+---
+title: 'Update Product'
+openapi: 'POST /plans/{plan_id}'
+---
+
+Updates an existing product (plan). All fields are optional - only include the fields you want to update. By default, creates a new version of the product.
+
+## Path Parameters
+
+<ParamField path="plan_id" type="string" required>
+  The unique identifier of the product to update.
+  
+  ```
+  premium-plan
+  ```
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="version" type="number">
+  Specific version to update. If not provided, updates the latest version.
+</ParamField>
+
+<ParamField query="upsert" type="boolean">
+  If `true`, creates the product if it doesn't exist.
+</ParamField>
+
+<ParamField query="disable_version" type="boolean">
+  If `true`, updates the product in-place without creating a new version.
+</ParamField>
+
+## Request Body
+
+All fields are optional. Only include the fields you want to update.
+
+<ParamField body="id" type="string">
+  Update the product ID (use with caution).
+</ParamField>
+
+<ParamField body="name" type="string">
+  Update the display name.
+  
+  ```json
+  "Premium Plus Plan"
+  ```
+</ParamField>
+
+<ParamField body="description" type="string | null">
+  Update the product description.
+  
+  ```json
+  "Enhanced premium features with priority support"
+  ```
+</ParamField>
+
+<ParamField body="group" type="string">
+  Update the product group.
+  
+  ```json
+  "subscription-plans"
+  ```
+</ParamField>
+
+<ParamField body="add_on" type="boolean">
+  Update whether this is an add-on product.
+</ParamField>
+
+<ParamField body="auto_enable" type="boolean">
+  Update whether this product auto-enables for new customers.
+</ParamField>
+
+<ParamField body="archived" type="boolean">
+  Archive or unarchive the product.
+</ParamField>
+
+<ParamField body="version" type="number">
+  Set a specific version number (advanced use).
+</ParamField>
+
+<ParamField body="price" type="object">
+  Update the base price configuration.
+  
+  <ParamField body="price.amount" type="number" required>
+    Price amount in cents.
+  </ParamField>
+  
+  <ParamField body="price.interval" type="string" required>
+    Billing interval. One of: `one_off`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+  </ParamField>
+  
+  <ParamField body="price.interval_count" type="number">
+    Number of intervals between billings.
+  </ParamField>
+</ParamField>
+
+<ParamField body="items" type="array">
+  Update the product items (features). This replaces the entire items array.
+  
+  <ParamField body="items[].feature_id" type="string" required>
+    ID of the feature to include.
+  </ParamField>
+  
+  <ParamField body="items[].included" type="number">
+    Amount of the feature included.
+  </ParamField>
+  
+  <ParamField body="items[].unlimited" type="boolean">
+    Whether the feature has unlimited usage.
+  </ParamField>
+  
+  <ParamField body="items[].reset" type="object">
+    Reset configuration for usage limits.
+    
+    <ParamField body="items[].reset.interval" type="string" required>
+      Reset interval. One of: `one_off`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+    </ParamField>
+    
+    <ParamField body="items[].reset.interval_count" type="number">
+      Number of intervals between resets.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].price" type="object">
+    Pricing configuration for this feature.
+    
+    <ParamField body="items[].price.amount" type="number">
+      Flat price per billing unit (mutually exclusive with `tiers`).
+    </ParamField>
+    
+    <ParamField body="items[].price.tiers" type="array">
+      Tiered pricing structure (mutually exclusive with `amount`). Each tier has:
+      - `to`: Upper bound of the tier (use `"infinite"` for the last tier)
+      - `amount`: Price per unit in this tier
+    </ParamField>
+    
+    <ParamField body="items[].price.interval" type="string" required>
+      Billing interval for this feature.
+    </ParamField>
+    
+    <ParamField body="items[].price.interval_count" type="number" default="1">
+      Number of intervals between billings.
+    </ParamField>
+    
+    <ParamField body="items[].price.billing_units" type="number" default="1">
+      Number of units billed together.
+    </ParamField>
+    
+    <ParamField body="items[].price.billing_method" type="string" required>
+      Billing method. One of: `prepaid`, `usage_based`.
+    </ParamField>
+    
+    <ParamField body="items[].price.max_purchase" type="number">
+      Maximum number of units that can be purchased.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].proration" type="object">
+    Proration behavior when the product is changed mid-cycle.
+    
+    <ParamField body="items[].proration.on_increase" type="string">
+      Behavior on upgrade. One of: `bill_immediately`, `prorate_immediately`, `prorate_next_cycle`, `bill_next_cycle`.
+    </ParamField>
+    
+    <ParamField body="items[].proration.on_decrease" type="string">
+      Behavior on downgrade. One of: `prorate`, `prorate_immediately`, `prorate_next_cycle`, `none`, `no_prorations`.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].rollover" type="object">
+    Rollover configuration for unused usage.
+    
+    <ParamField body="items[].rollover.max" type="number">
+      Maximum amount that can rollover.
+    </ParamField>
+    
+    <ParamField body="items[].rollover.expiry_duration_type" type="string" required>
+      Duration type for rollover expiry.
+    </ParamField>
+    
+    <ParamField body="items[].rollover.expiry_duration_length" type="number">
+      Length of expiry duration.
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ParamField body="free_trial" type="object">
+  Update the free trial configuration.
+  
+  <ParamField body="free_trial.duration_length" type="number" required>
+    Length of the free trial period.
+  </ParamField>
+  
+  <ParamField body="free_trial.duration_type" type="string" default="month">
+    Unit of time for the trial duration. One of: `day`, `month`, `year`.
+  </ParamField>
+  
+  <ParamField body="free_trial.card_required" type="boolean" default="true">
+    Whether a credit card is required to start the trial.
+  </ParamField>
+</ParamField>
+
+## Response
+
+Returns the updated product object with all fields.
+
+<ResponseField name="id" type="string">
+  Unique identifier for the product.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Display name of the product.
+</ResponseField>
+
+<ResponseField name="description" type="string | null">
+  Description of the product.
+</ResponseField>
+
+<ResponseField name="group" type="string | null">
+  Product group identifier.
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Updated version number of the product.
+</ResponseField>
+
+<ResponseField name="add_on" type="boolean">
+  Whether this product is an add-on.
+</ResponseField>
+
+<ResponseField name="default" type="boolean">
+  Whether this is the default product.
+</ResponseField>
+
+<ResponseField name="price" type="object | null">
+  Base price configuration.
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Array of features included in the product.
+</ResponseField>
+
+<ResponseField name="free_trial" type="object | null">
+  Free trial configuration if enabled.
+</ResponseField>
+
+<ResponseField name="created_at" type="number">
+  Unix timestamp when the product was created.
+</ResponseField>
+
+<ResponseField name="env" type="string">
+  Environment the product belongs to.
+</ResponseField>
+
+<ResponseField name="archived" type="boolean">
+  Whether the product is archived.
+</ResponseField>
+
+<ResponseField name="base_variant_id" type="string | null">
+  ID of the base variant if this is a product variant.
+</ResponseField>
+
+## Example Request
+
+### Update price and name
+
+```json
+{
+  "name": "Premium Plus Plan",
+  "price": {
+    "amount": 3999,
+    "interval": "month",
+    "interval_count": 1
+  }
+}
+```
+
+### Add a new feature to items
+
+```json
+{
+  "items": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "unlimited": false,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1
+      }
+    },
+    {
+      "feature_id": "priority-support",
+      "included": 1,
+      "unlimited": true
+    }
+  ]
+}
+```
+
+### Update free trial settings
+
+```json
+{
+  "free_trial": {
+    "duration_length": 30,
+    "duration_type": "day",
+    "card_required": false
+  }
+}
+```
+
+### Archive a product
+
+```json
+{
+  "archived": true
+}
+```
+
+## Example Response
+
+```json
+{
+  "id": "premium-plan",
+  "name": "Premium Plus Plan",
+  "description": "Full access to all premium features",
+  "group": "subscription-plans",
+  "version": 2,
+  "add_on": false,
+  "default": false,
+  "price": {
+    "amount": 3999,
+    "interval": "month",
+    "interval_count": 1
+  },
+  "features": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "unlimited": false,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1
+      },
+      "price": null
+    },
+    {
+      "feature_id": "priority-support",
+      "included": 1,
+      "unlimited": true,
+      "reset": null,
+      "price": null
+    }
+  ],
+  "free_trial": {
+    "duration_length": 14,
+    "duration_type": "day",
+    "card_required": true
+  },
+  "created_at": 1708272000,
+  "env": "production",
+  "archived": false,
+  "base_variant_id": null
+}
+```
+
+## Notes
+
+- By default, updating a product creates a new version. Existing customers remain on their current version unless explicitly migrated.
+- Use `disable_version=true` to update the product in-place without versioning.
+- When updating `items`, the entire array is replaced. Include all items you want to keep.
+- Price and feature changes may affect existing subscriptions based on your proration settings.

@@ -1,0 +1,760 @@
+---
+title: "Managing Subscriptions"
+description: "Handle upgrades, downgrades, cancellations, and subscription lifecycle management"
+---
+
+## Overview
+
+Autumn provides powerful subscription management capabilities, allowing you to handle plan changes, cancellations, pausing, and proration automatically. All subscription operations are handled through the `/attach` and `/update-subscription` endpoints.
+
+## Subscription Lifecycle
+
+### Creating a Subscription
+
+Use `/attach` to create a new subscription:
+
+```typescript
+const createSubscription = async (customerId: string, productId: string) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: productId,
+      success_url: 'https://yourapp.com/success'
+    })
+  });
+
+  const data = await response.json();
+  
+  if (data.checkout_url) {
+    // Redirect to checkout if payment required
+    window.location.href = data.checkout_url;
+  } else {
+    // Subscription created successfully
+    console.log('Subscription active:', data);
+  }
+  
+  return data;
+};
+```
+
+<Note>
+  If the customer doesn't have a payment method on file, Autumn returns a `checkout_url` for them to complete payment setup.
+</Note>
+
+## Upgrades and Downgrades
+
+### Upgrading Plans
+
+Use `/attach` to upgrade a customer to a higher-tier plan:
+
+```typescript
+const upgradePlan = async (customerId: string, newPlanId: string) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: newPlanId  // e.g., 'pro_plan'
+    })
+  });
+
+  return await response.json();
+};
+
+// Upgrade from Basic ($29/mo) to Pro ($99/mo)
+await upgradePlan('cus_123', 'pro_plan');
+
+// Autumn automatically:
+// - Cancels the old subscription
+// - Creates the new subscription
+// - Prorates the charges (credits unused time, charges new plan)
+// - Migrates usage and balances
+```
+
+### Downgrading Plans
+
+Downgrade to a lower-tier plan:
+
+```typescript
+const downgradePlan = async (customerId: string, newPlanId: string) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: newPlanId  // e.g., 'basic_plan'
+    })
+  });
+
+  return await response.json();
+};
+
+// Downgrade from Pro ($99/mo) to Basic ($29/mo)
+await downgradePlan('cus_123', 'basic_plan');
+
+// By default:
+// - Downgrade takes effect immediately
+// - Customer gets prorated credit
+// - Credit applied to next invoice
+```
+
+### Controlling Upgrade/Downgrade Behavior
+
+Control when and how plan changes take effect:
+
+```typescript
+const changePlan = async ({
+  customerId,
+  newPlanId,
+  behavior
+}: {
+  customerId: string;
+  newPlanId: string;
+  behavior: 'prorate_immediately' | 'next_cycle_only';
+}) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: newPlanId,
+      billing_behavior: behavior
+    })
+  });
+
+  return await response.json();
+};
+
+// Immediate change with proration (default)
+await changePlan({
+  customerId: 'cus_123',
+  newPlanId: 'pro_plan',
+  behavior: 'prorate_immediately'
+});
+
+// Schedule change for next billing cycle
+await changePlan({
+  customerId: 'cus_123',
+  newPlanId: 'basic_plan',
+  behavior: 'next_cycle_only'
+});
+```
+
+<Tip>
+  Use `next_cycle_only` for downgrades to let customers use their current plan until they've paid for, avoiding mid-cycle disruption.
+</Tip>
+
+## Proration
+
+### Understanding Proration
+
+Autumn automatically calculates prorated charges when plans change mid-cycle:
+
+**Upgrade Example**: Customer upgrades from $29/mo to $99/mo on day 15 of 30
+
+1. **Credit for unused time**: (15 days / 30 days) × $29 = $14.50
+2. **Charge for new plan**: (15 days / 30 days) × $99 = $49.50
+3. **Net charge**: $49.50 - $14.50 = **$35.00**
+
+**Downgrade Example**: Customer downgrades from $99/mo to $29/mo on day 15 of 30
+
+1. **Credit for unused time**: (15 days / 30 days) × $99 = $49.50
+2. **Charge for new plan**: (15 days / 30 days) × $29 = $14.50
+3. **Credit balance**: $49.50 - $14.50 = **$35.00** (applied to next invoice)
+
+### Preview Proration
+
+Preview charges before committing to a plan change:
+
+```typescript
+const previewPlanChange = async (customerId: string, newPlanId: string) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription/preview', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      plan_id: newPlanId
+    })
+  });
+
+  const preview = await response.json();
+  
+  return {
+    immediate_charge: preview.amount_due,
+    next_invoice_date: preview.next_invoice_date,
+    new_plan_price: preview.new_plan_amount,
+    proration_credit: preview.proration_credit,
+    line_items: preview.line_items
+  };
+};
+
+// Show customer what they'll be charged
+const preview = await previewPlanChange('cus_123', 'pro_plan');
+console.log(`You'll be charged $${preview.immediate_charge / 100} now`);
+console.log(`Next invoice: $${preview.new_plan_price / 100} on ${preview.next_invoice_date}`);
+```
+
+### Disable Proration
+
+Charge the full price regardless of when in the billing cycle:
+
+```typescript
+const upgradeWithoutProration = async (customerId: string, newPlanId: string) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: newPlanId,
+      new_billing_subscription: true  // Start fresh billing cycle
+    })
+  });
+
+  return await response.json();
+};
+```
+
+<Warning>
+  Setting `new_billing_subscription: true` creates a separate billing subscription. The customer will have two billing cycles until the old one ends.
+</Warning>
+
+## Cancellations
+
+### Immediate Cancellation
+
+Cancel subscription immediately with prorated refund:
+
+```typescript
+const cancelImmediately = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      cancel_action: 'cancel_immediately'
+    })
+  });
+
+  return await response.json();
+};
+
+// Cancel and refund unused time
+await cancelImmediately('cus_123');
+
+// If customer paid $99 for the month and cancels on day 15:
+// - Unused time: 15 days
+// - Refund: (15/30) × $99 = $49.50
+```
+
+### Cancel at Period End
+
+Let customer use their plan until the end of the billing period:
+
+```typescript
+const cancelAtPeriodEnd = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      cancel_action: 'cancel_end_of_cycle'
+    })
+  });
+
+  return await response.json();
+};
+
+// Schedule cancellation for end of period
+await cancelAtPeriodEnd('cus_123');
+
+// Customer keeps access until period ends
+// No refund issued
+// Subscription won't renew
+```
+
+<Tip>
+  `cancel_end_of_cycle` is recommended for better customer experience - they get to use what they paid for.
+</Tip>
+
+### Reactivate Cancelled Subscription
+
+Undo a scheduled cancellation:
+
+```typescript
+const reactivateSubscription = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      cancel_action: 'uncancel'
+    })
+  });
+
+  return await response.json();
+};
+
+// Customer changed their mind
+await reactivateSubscription('cus_123');
+```
+
+### Cancellation Flow with Confirmation
+
+```typescript
+const handleCancellation = async (customerId: string) => {
+  // Get current subscription details
+  const checkResponse = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: 'current_plan'
+    })
+  });
+  
+  const { balance } = await checkResponse.json();
+  const daysRemaining = Math.ceil(
+    (balance.reset?.resets_at - Date.now()) / (1000 * 60 * 60 * 24)
+  );
+
+  // Confirm with customer
+  const confirmed = confirm(
+    `You have ${daysRemaining} days remaining in your billing cycle. \n\n` +
+    `Cancel now: Get a prorated refund\n` +
+    `Cancel at period end: Keep access for ${daysRemaining} more days\n\n` +
+    `What would you prefer?`
+  );
+
+  if (confirmed) {
+    // Let customer choose
+    const immediate = confirm('Cancel immediately and get refund?');
+    
+    if (immediate) {
+      await cancelImmediately(customerId);
+      alert('Subscription cancelled. Refund will be processed.');
+    } else {
+      await cancelAtPeriodEnd(customerId);
+      alert(`Subscription will end in ${daysRemaining} days.`);
+    }
+  }
+};
+```
+
+## Pausing Subscriptions
+
+Pause and resume subscriptions (useful for seasonal businesses):
+
+```typescript
+const pauseSubscription = async (customerId: string, resumeDate?: Date) => {
+  // Cancel at period end
+  await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      cancel_action: 'cancel_end_of_cycle'
+    })
+  });
+
+  // Store resume date in your database
+  if (resumeDate) {
+    await db.subscriptions.update(customerId, {
+      paused: true,
+      resume_date: resumeDate
+    });
+  }
+};
+
+const resumeSubscription = async (customerId: string, planId: string) => {
+  // Reactivate the subscription
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId
+    })
+  });
+
+  // Clear paused status
+  await db.subscriptions.update(customerId, {
+    paused: false,
+    resume_date: null
+  });
+
+  return await response.json();
+};
+
+// Pause for 3 months
+const resumeDate = new Date();
+resumeDate.setMonth(resumeDate.getMonth() + 3);
+await pauseSubscription('cus_123', resumeDate);
+
+// Resume
+await resumeSubscription('cus_123', 'pro_plan');
+```
+
+## Modifying Subscriptions
+
+### Update Feature Quantities
+
+Change quantities for specific features (seats, licenses, etc.):
+
+```typescript
+const updateQuantities = async ({
+  customerId,
+  quantities
+}: {
+  customerId: string;
+  quantities: Array<{
+    feature_id: string;
+    quantity: number;
+  }>;
+}) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_quantities: quantities
+    })
+  });
+
+  return await response.json();
+};
+
+// Add 5 more seats
+await updateQuantities({
+  customerId: 'cus_123',
+  quantities: [
+    { feature_id: 'team_seats', quantity: 10 }  // New total
+  ]
+});
+```
+
+### Add Multiple Products
+
+Attach add-ons or additional products:
+
+```typescript
+const addProducts = async (customerId: string, productIds: string[]) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_ids: productIds
+    })
+  });
+
+  return await response.json();
+};
+
+// Add storage and support add-ons
+await addProducts('cus_123', ['addon_storage', 'addon_priority_support']);
+```
+
+### Apply Custom Pricing
+
+Create a custom plan for a specific customer:
+
+```typescript
+const applyCustomPricing = async ({
+  customerId,
+  customItems
+}: {
+  customerId: string;
+  customItems: Array<any>;
+}) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: customItems
+    })
+  });
+
+  return await response.json();
+};
+
+// Apply enterprise pricing with custom discounts
+await applyCustomPricing({
+  customerId: 'cus_enterprise',
+  customItems: [
+    {
+      feature_id: 'team_seats',
+      included: 100,
+      price: {
+        amount: 800,  // $8/seat instead of $20
+        interval: 'month'
+      }
+    },
+    {
+      feature_id: 'api_calls',
+      included: 1000000,  // 1M calls
+      unlimited: false,
+      price: {
+        amount: 10,  // $0.10 per 1k overage
+        billing_units: 1000,
+        billing_method: 'per_unit'
+      }
+    }
+  ]
+});
+```
+
+## Handling Failed Payments
+
+When subscription payments fail, Autumn automatically:
+
+1. Retries the payment (configurable retry schedule)
+2. Sends webhooks to your system
+3. Updates subscription status
+4. Optionally disables access
+
+```typescript
+// Listen for webhook events
+app.post('/webhooks/autumn', async (req, res) => {
+  const event = req.body;
+
+  switch (event.type) {
+    case 'invoice.payment_failed':
+      const customerId = event.data.customer_id;
+      const invoiceId = event.data.invoice_id;
+      
+      // Notify customer
+      await sendEmail({
+        to: event.data.customer_email,
+        subject: 'Payment Failed',
+        body: `Your payment for invoice ${invoiceId} failed. Please update your payment method.`
+      });
+      
+      // Optionally revoke access after multiple failures
+      const failureCount = await getPaymentFailureCount(customerId);
+      if (failureCount >= 3) {
+        await disableCustomerAccess(customerId);
+      }
+      break;
+
+    case 'invoice.payment_succeeded':
+      // Re-enable access if it was disabled
+      await enableCustomerAccess(event.data.customer_id);
+      break;
+
+    case 'subscription.cancelled':
+      // Handle subscription cancellation
+      await handleCancellation(event.data.customer_id);
+      break;
+  }
+
+  res.json({ received: true });
+});
+```
+
+## Subscription Management UI
+
+```tsx
+import React, { useState, useEffect } from 'react';
+
+interface Subscription {
+  plan_id: string;
+  plan_name: string;
+  amount: number;
+  interval: string;
+  status: 'active' | 'cancelled' | 'past_due';
+  cancel_at_period_end: boolean;
+  current_period_end: number;
+}
+
+const SubscriptionManager: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSubscription();
+  }, [customerId]);
+
+  const fetchSubscription = async () => {
+    const response = await fetch(`/api/subscription?customer_id=${customerId}`);
+    const data = await response.json();
+    setSubscription(data);
+    setLoading(false);
+  };
+
+  const handleUpgrade = async () => {
+    await fetch('/api/subscription/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId, plan_id: 'pro_plan' })
+    });
+    await fetchSubscription();
+  };
+
+  const handleCancel = async () => {
+    const immediate = confirm('Cancel immediately or at period end?');
+    
+    await fetch('/api/subscription/cancel', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id: customerId,
+        cancel_action: immediate ? 'cancel_immediately' : 'cancel_end_of_cycle'
+      })
+    });
+    
+    await fetchSubscription();
+  };
+
+  const handleReactivate = async () => {
+    await fetch('/api/subscription/reactivate', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId })
+    });
+    await fetchSubscription();
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (!subscription) return <div>No active subscription</div>;
+
+  const periodEnd = new Date(subscription.current_period_end).toLocaleDateString();
+
+  return (
+    <div className="subscription-manager">
+      <h2>Your Subscription</h2>
+      
+      <div className="plan-info">
+        <h3>{subscription.plan_name}</h3>
+        <p className="price">
+          ${subscription.amount / 100}/{subscription.interval}
+        </p>
+        <p className="status">Status: {subscription.status}</p>
+      </div>
+
+      {subscription.cancel_at_period_end && (
+        <div className="cancellation-notice">
+          ⚠️ Your subscription will end on {periodEnd}
+          <button onClick={handleReactivate}>Reactivate</button>
+        </div>
+      )}
+
+      <div className="actions">
+        {subscription.plan_id !== 'pro_plan' && (
+          <button onClick={handleUpgrade} className="upgrade-button">
+            Upgrade to Pro
+          </button>
+        )}
+        
+        {!subscription.cancel_at_period_end && (
+          <button onClick={handleCancel} className="cancel-button">
+            Cancel Subscription
+          </button>
+        )}
+      </div>
+
+      <p className="renewal-date">
+        {subscription.cancel_at_period_end
+          ? `Ends on ${periodEnd}`
+          : `Renews on ${periodEnd}`
+        }
+      </p>
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+<Tip>
+  **Always preview changes before applying them**: Use preview endpoints to show customers exactly what they'll be charged.
+</Tip>
+
+<Warning>
+  **Handle failed payments gracefully**: Don't immediately revoke access. Give customers time to update their payment method.
+</Warning>
+
+<Note>
+  **Communicate clearly**: Send emails for all subscription changes, cancellations, and payment issues.
+</Note>
+
+### Customer Experience
+
+1. **Make upgrades easy**: One-click upgrade with clear pricing
+2. **Flexible cancellation**: Offer both immediate and end-of-period options
+3. **Transparent proration**: Show exactly what customers will pay
+4. **Reactivation option**: Let customers easily undo cancellations
+5. **Clear communication**: Email confirmations for all changes
+
+### Technical Implementation
+
+1. **Use webhooks**: Listen for subscription events from Autumn
+2. **Handle edge cases**: Payment failures, partial refunds, timing issues
+3. **Test thoroughly**: Especially proration calculations
+4. **Log everything**: Audit trail for subscription changes
+5. **Idempotency**: Make operations safe to retry
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Checkout Flows" icon="credit-card" href="/guides/checkout-flows">
+    Implement payment flows
+  </Card>
+  
+  <Card title="Custom Pricing" icon="dollar-sign" href="/guides/custom-pricing">
+    Enterprise pricing strategies
+  </Card>
+  
+  <Card title="Attach API" icon="code" href="/api/core/attach">
+    Complete attach documentation
+  </Card>
+  
+  <Card title="Webhooks" icon="webhook" href="/concepts/webhooks">
+    Handle subscription events
+  </Card>
+</CardGroup>

@@ -1,0 +1,252 @@
+---
+title: 'Changelog'
+description: 'Recent changes, new features, and improvements to Autumn'
+---
+
+## Overview
+
+This page tracks all significant changes to the Autumn API and platform. We follow semantic versioning and maintain backward compatibility.
+
+<Note>
+  Subscribe to our [GitHub releases](https://github.com/useautumn/autumn/releases) to get notified of new versions.
+</Note>
+
+## 2026
+
+### February 2026
+
+<AccordionGroup>
+  <Accordion title="API Version 1.2 - Feature Breakdown Structure" icon="sparkles">
+    **Released:** February 18, 2026
+    
+    **New Features:**
+    - Features now return as objects with `breakdown` arrays
+    - Better support for multi-interval features
+    - Improved feature representation with detailed usage data
+    - CheckResult includes full feature breakdown
+    
+    **Breaking Changes:**
+    - None (backward compatible via version header)
+    
+    **Migration:**
+    See [Migration Guide](/resources/migration-guide) for upgrading from v1.1 to v1.2.
+  </Accordion>
+
+  <Accordion title="Enhanced Rate Limiting" icon="gauge">
+    **Released:** February 2026
+    
+    **Improvements:**
+    - Added customer-scoped rate limiting for better parallelism
+    - Increased track endpoint limits to 10,000 req/sec per customer
+    - Added dedicated rate limits for events query endpoints
+    - Optimized in-memory rate limiting for high-traffic endpoints
+    
+    **Details:**
+    - Track endpoints: 10,000 req/sec (per customer)
+    - Check endpoints: 10,000 req/sec (per customer)
+    - Events queries: 5 req/sec (per customer)
+    - Attach: 5 req/min (per customer)
+  </Accordion>
+</AccordionGroup>
+
+## 2025
+
+### December 2025
+
+<AccordionGroup>
+  <Accordion title="API Key Security Enhancements" icon="shield">
+    **Released:** December 2025
+    
+    **Improvements:**
+    - Enhanced API key generation with 42-character keys
+    - SHA-256 hashing for stored keys
+    - Key caching with 1-hour TTL for improved performance
+    - Environment auto-detection from key prefix
+    
+    **Security:**
+    - Keys are now hashed before storage
+    - Only key prefixes are visible after creation
+    - Cryptographically secure random generation
+  </Accordion>
+
+  <Accordion title="Versioning Architecture" icon="code-branch">
+    **Released:** December 2025
+    
+    **New Features:**
+    - Compositional version change system
+    - Shared transformation utilities
+    - Resource-level version changes
+    - Automatic version transformation
+    
+    **Benefits:**
+    - DRY transformation logic
+    - Type-safe version handling
+    - Easier to maintain backward compatibility
+  </Accordion>
+</AccordionGroup>
+
+### November 2025
+
+<AccordionGroup>
+  <Accordion title="Error Handling Improvements" icon="triangle-exclamation">
+    **Released:** November 2025
+    
+    **New Features:**
+    - Standardized error response format
+    - Machine-readable error codes
+    - Detailed error context in `data` field
+    - Consistent error handling across all endpoints
+    
+    **Error Types:**
+    - `RecaseError` for expected/client errors
+    - `InternalError` for server-side errors
+    
+    **Error Codes Added:**
+    - Customer errors: `customer_not_found`, `customer_already_exists`
+    - Product errors: `product_not_found`, `invalid_product_item`
+    - Feature errors: `feature_not_found`, `duplicate_feature_id`
+    - Entity errors: `entity_not_found`, `entity_already_exists`
+    - Balance errors: `insufficient_balance`
+  </Accordion>
+</AccordionGroup>
+
+### October 2025
+
+<AccordionGroup>
+  <Accordion title="Database Migration System" icon="database">
+    **Released:** October 2025
+    
+    **Improvements:**
+    - Drizzle ORM integration
+    - Version-controlled migrations
+    - Improved migration workflow
+    
+    **Commands:**
+    - `bun db:push` - Push schema changes (development)
+    - `bun db:generate` - Generate migration files
+    - `bun db:migrate` - Apply pending migrations
+  </Accordion>
+
+  <Accordion title="Better Auth Integration" icon="user-lock">
+    **Released:** October 2025
+    
+    **New Features:**
+    - OAuth provider support
+    - Magic link authentication
+    - Session management
+    - User management dashboard
+  </Accordion>
+</AccordionGroup>
+
+### September 2025
+
+<AccordionGroup>
+  <Accordion title="Stripe Integration v19.3" icon="stripe">
+    **Released:** September 2025
+    
+    **Updates:**
+    - Upgraded to Stripe API v19.3.0-beta.1
+    - Enhanced webhook handling
+    - Improved checkout session management
+    - Better subscription lifecycle handling
+  </Accordion>
+</AccordionGroup>
+
+## Breaking Changes
+
+<Warning>
+  All breaking changes are versioned and backward compatible via API version headers.
+</Warning>
+
+No breaking changes have been introduced without backward compatibility. All changes are opt-in via API version headers.
+
+## Deprecation Notices
+
+### API Version 1.0
+
+<Note>
+  API Version 1.0 will be deprecated on **August 18, 2026**. Please upgrade to v1.2.
+</Note>
+
+**Timeline:**
+- **February 18, 2026** - Deprecation announced
+- **August 18, 2026** - Version 1.0 will be sunset
+- **Migration period** - 6 months to upgrade
+
+## Upcoming Features
+
+<CardGroup cols={2}>
+  <Card title="GraphQL API" icon="diagram-project">
+    GraphQL endpoint for more flexible queries. Expected Q2 2026.
+  </Card>
+  
+  <Card title="Webhook Signatures" icon="signature">
+    Enhanced webhook security with signature verification. Expected Q2 2026.
+  </Card>
+  
+  <Card title="Bulk Operations" icon="layer-group">
+    Batch endpoints for bulk customer and feature updates. Expected Q3 2026.
+  </Card>
+  
+  <Card title="Advanced Analytics" icon="chart-line">
+    Enhanced analytics and reporting API. Expected Q3 2026.
+  </Card>
+</CardGroup>
+
+## Infrastructure Updates
+
+### February 2026
+
+- Upgraded to Bun runtime for improved performance
+- Enhanced Docker configuration for development
+- Improved localtunnel integration for webhooks
+- Better Supabase database setup in setup script
+
+### January 2026
+
+- Redis caching layer optimizations
+- ClickHouse integration for analytics
+- Sentry error tracking integration
+- Improved logging and monitoring
+
+## Documentation Updates
+
+### February 2026
+
+- Complete API reference documentation
+- New versioning guide
+- Enhanced error handling documentation
+- Rate limiting best practices
+
+### January 2026
+
+- Updated quickstart guide
+- Self-hosting documentation
+- Contributing guide updates
+- Development setup improvements
+
+## Community
+
+### February 2026
+
+- Launched community Discord server
+- Added Ask DeepWiki integration
+- Created contribution guidelines
+- Expanded GitHub discussions
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Migration Guide" icon="arrow-right" href="/resources/migration-guide">
+    Learn how to upgrade between versions
+  </Card>
+  <Card title="API Versioning" icon="code-branch" href="/resources/versioning">
+    Understand API version management
+  </Card>
+  <Card title="GitHub Releases" icon="github" href="https://github.com/useautumn/autumn/releases">
+    View detailed release notes
+  </Card>
+  <Card title="Support" icon="life-ring" href="/community/support">
+    Get help with upgrades
+  </Card>
+</CardGroup>

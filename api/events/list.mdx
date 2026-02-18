@@ -1,0 +1,134 @@
+---
+title: 'List Events'
+openapi: 'POST /events/list'
+---
+
+Retrieve a paginated list of events. Events represent usage tracking data for features.
+
+## Request Body
+
+<ParamField path="customer_id" type="string">
+  Filter events by customer ID
+</ParamField>
+
+<ParamField path="feature_id" type="string | array">
+  Filter by specific feature ID(s). Can be a single string or an array of strings.
+</ParamField>
+
+<ParamField path="custom_range" type="object">
+  Filter events by time range
+  
+  <Expandable title="Custom Range">
+    <ParamField path="start" type="number">
+      Filter events after this timestamp (epoch milliseconds)
+    </ParamField>
+    
+    <ParamField path="end" type="number">
+      Filter events before this timestamp (epoch milliseconds)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="limit" type="number" default="100">
+  Number of events to return per page (max 100)
+</ParamField>
+
+<ParamField path="offset" type="number" default="0">
+  Number of events to skip for pagination
+</ParamField>
+
+## Response
+
+<ResponseField name="list" type="array">
+  Array of event objects
+  
+  <Expandable title="Event Object">
+    <ResponseField name="id" type="string">
+      Event ID (KSUID)
+    </ResponseField>
+    
+    <ResponseField name="timestamp" type="number">
+      Event timestamp (epoch milliseconds)
+    </ResponseField>
+    
+    <ResponseField name="feature_id" type="string">
+      ID of the feature that the event belongs to
+    </ResponseField>
+    
+    <ResponseField name="customer_id" type="string">
+      Customer identifier
+    </ResponseField>
+    
+    <ResponseField name="value" type="number">
+      Event value/count
+    </ResponseField>
+    
+    <ResponseField name="properties" type="object">
+      Event properties (JSONB)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="number">
+  Total number of events matching the filter
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether there are more events to fetch
+</ResponseField>
+
+<ResponseField name="offset" type="number">
+  Current offset
+</ResponseField>
+
+<ResponseField name="limit" type="number">
+  Current limit
+</ResponseField>
+
+## Example
+
+```json Request
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "custom_range": {
+    "start": 1765900000000,
+    "end": 1765990000000
+  },
+  "limit": 10,
+  "offset": 0
+}
+```
+
+```json Response
+{
+  "list": [
+    {
+      "id": "evt_36xpk2TmuQX5zVPPQ8tCtnR5Weg",
+      "timestamp": 1765958215459,
+      "feature_id": "api_calls",
+      "customer_id": "cus_123",
+      "value": 30,
+      "properties": {
+        "endpoint": "/api/users",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "evt_36xmHxxjAkqxufDf9yHAPNfRrLM",
+      "timestamp": 1765956512057,
+      "feature_id": "api_calls",
+      "customer_id": "cus_123",
+      "value": 49,
+      "properties": {
+        "endpoint": "/api/products",
+        "method": "POST"
+      }
+    }
+  ],
+  "total": 2,
+  "has_more": false,
+  "offset": 0,
+  "limit": 10
+}
+```

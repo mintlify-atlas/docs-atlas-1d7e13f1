@@ -1,0 +1,101 @@
+---
+title: 'Update Balance'
+openapi: 'POST /balances/update'
+---
+
+Update or set the balance or usage for a specific feature for a customer. Either `current_balance` or `usage` must be provided, but not both.
+
+## Request Body
+
+<ParamField path="customer_id" type="string" required>
+  The ID of the customer
+</ParamField>
+
+<ParamField path="feature_id" type="string" required>
+  The ID of the feature to update balance for
+</ParamField>
+
+<ParamField path="entity_id" type="string">
+  The ID of the entity to update balance for (if using entity balances)
+</ParamField>
+
+<ParamField path="current_balance" type="number">
+  The new balance value to set. Cannot be specified with `add_to_balance`.
+</ParamField>
+
+<ParamField path="add_to_balance" type="number">
+  Amount to add to the current balance. Use negative values to subtract. Cannot be specified with `current_balance`.
+</ParamField>
+
+<ParamField path="interval" type="enum">
+  The interval to update balance for: `day`, `week`, `month`, `year`, `billing_period`
+</ParamField>
+
+<ParamField path="granted_balance" type="number">
+  Update the granted balance amount. Requires `current_balance` to also be provided.
+</ParamField>
+
+<ParamField path="usage" type="number">
+  Set the usage value directly
+</ParamField>
+
+<ParamField path="customer_entitlement_id" type="string">
+  The customer entitlement ID to update (advanced usage)
+</ParamField>
+
+<ParamField path="next_reset_at" type="number">
+  Unix timestamp (milliseconds) for the next reset. Requires `customer_entitlement_id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the balance was updated successfully
+</ResponseField>
+
+## Validation Rules
+
+- Cannot specify both `add_to_balance` and `current_balance`
+- `granted_balance` requires `current_balance` to be provided
+- `next_reset_at` requires `customer_entitlement_id` to be provided
+
+## Examples
+
+```json Request - Set Balance
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "current_balance": 500
+}
+```
+
+```json Request - Add to Balance
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "add_to_balance": 100
+}
+```
+
+```json Request - Subtract from Balance
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "add_to_balance": -50
+}
+```
+
+```json Request - Update Granted Balance
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "current_balance": 1000,
+  "granted_balance": 1000
+}
+```
+
+```json Response
+{
+  "success": true
+}
+```

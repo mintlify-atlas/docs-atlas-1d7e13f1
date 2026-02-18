@@ -1,0 +1,348 @@
+---
+title: 'Create Product'
+openapi: 'POST /plans'
+---
+
+Creates a new product (plan) in your Autumn environment. Products define the pricing structure and features available to customers.
+
+## Request Body
+
+<ParamField body="id" type="string" required>
+  Unique identifier for the product. Must match the pattern for valid IDs (alphanumeric, hyphens, underscores).
+  
+  ```json
+  "premium-plan"
+  ```
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Display name for the product.
+  
+  ```json
+  "Premium Plan"
+  ```
+</ParamField>
+
+<ParamField body="description" type="string" default="null">
+  Optional description of the product. Set to `null` if not provided.
+  
+  ```json
+  "Full access to all premium features"
+  ```
+</ParamField>
+
+<ParamField body="group" type="string" default="">
+  Logical grouping for the product. Use this to organize products into categories.
+  
+  ```json
+  "subscription-plans"
+  ```
+</ParamField>
+
+<ParamField body="add_on" type="boolean" default="false">
+  Whether this product is an add-on that can be attached to other products.
+</ParamField>
+
+<ParamField body="auto_enable" type="boolean" default="false">
+  Whether this product should be automatically enabled for new customers.
+</ParamField>
+
+<ParamField body="price" type="object">
+  Base price configuration for the product.
+  
+  <ParamField body="price.amount" type="number" required>
+    Price amount in cents (e.g., 2999 for $29.99).
+  </ParamField>
+  
+  <ParamField body="price.interval" type="string" required>
+    Billing interval. One of: `one_off`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+  </ParamField>
+  
+  <ParamField body="price.interval_count" type="number">
+    Number of intervals between billings. For example, `interval=month` and `interval_count=3` bills every 3 months.
+  </ParamField>
+</ParamField>
+
+<ParamField body="items" type="array">
+  Array of product items (features) included in this product.
+  
+  <ParamField body="items[].feature_id" type="string" required>
+    ID of the feature to include.
+  </ParamField>
+  
+  <ParamField body="items[].included" type="number">
+    Amount of the feature included in the product.
+  </ParamField>
+  
+  <ParamField body="items[].unlimited" type="boolean">
+    Whether the feature has unlimited usage.
+  </ParamField>
+  
+  <ParamField body="items[].reset" type="object">
+    Reset configuration for usage limits.
+    
+    <ParamField body="items[].reset.interval" type="string" required>
+      Reset interval. One of: `one_off`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+    </ParamField>
+    
+    <ParamField body="items[].reset.interval_count" type="number">
+      Number of intervals between resets.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].price" type="object">
+    Pricing configuration for this feature. Can be either flat-rate or tiered.
+    
+    <ParamField body="items[].price.amount" type="number">
+      Flat price per billing unit (mutually exclusive with `tiers`).
+    </ParamField>
+    
+    <ParamField body="items[].price.tiers" type="array">
+      Tiered pricing structure (mutually exclusive with `amount`). Each tier has:
+      - `to`: Upper bound of the tier (use `"infinite"` for the last tier)
+      - `amount`: Price per unit in this tier
+    </ParamField>
+    
+    <ParamField body="items[].price.interval" type="string" required>
+      Billing interval for this feature.
+    </ParamField>
+    
+    <ParamField body="items[].price.interval_count" type="number" default="1">
+      Number of intervals between billings.
+    </ParamField>
+    
+    <ParamField body="items[].price.billing_units" type="number" default="1">
+      Number of units billed together.
+    </ParamField>
+    
+    <ParamField body="items[].price.billing_method" type="string" required>
+      Billing method. One of: `prepaid`, `usage_based`.
+    </ParamField>
+    
+    <ParamField body="items[].price.max_purchase" type="number">
+      Maximum number of units that can be purchased.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].proration" type="object">
+    Proration behavior when the product is changed mid-cycle.
+    
+    <ParamField body="items[].proration.on_increase" type="string">
+      Behavior on upgrade. One of: `bill_immediately`, `prorate_immediately`, `prorate_next_cycle`, `bill_next_cycle`.
+    </ParamField>
+    
+    <ParamField body="items[].proration.on_decrease" type="string">
+      Behavior on downgrade. One of: `prorate`, `prorate_immediately`, `prorate_next_cycle`, `none`, `no_prorations`.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="items[].rollover" type="object">
+    Rollover configuration for unused usage.
+    
+    <ParamField body="items[].rollover.max" type="number">
+      Maximum amount that can rollover.
+    </ParamField>
+    
+    <ParamField body="items[].rollover.expiry_duration_type" type="string" required>
+      Duration type for rollover expiry.
+    </ParamField>
+    
+    <ParamField body="items[].rollover.expiry_duration_length" type="number">
+      Length of expiry duration.
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ParamField body="free_trial" type="object">
+  Free trial configuration for the product.
+  
+  <ParamField body="free_trial.duration_length" type="number" required>
+    Length of the free trial period.
+  </ParamField>
+  
+  <ParamField body="free_trial.duration_type" type="string" default="month">
+    Unit of time for the trial duration. One of: `day`, `month`, `year`.
+  </ParamField>
+  
+  <ParamField body="free_trial.card_required" type="boolean" default="true">
+    Whether a credit card is required to start the trial.
+  </ParamField>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created product.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Display name of the product.
+</ResponseField>
+
+<ResponseField name="description" type="string | null">
+  Description of the product.
+</ResponseField>
+
+<ResponseField name="group" type="string | null">
+  Product group identifier.
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Version number of the product.
+</ResponseField>
+
+<ResponseField name="add_on" type="boolean">
+  Whether this product is an add-on.
+</ResponseField>
+
+<ResponseField name="default" type="boolean">
+  Whether this is the default product.
+</ResponseField>
+
+<ResponseField name="price" type="object | null">
+  Base price configuration.
+  
+  <ResponseField name="price.amount" type="number">
+    Price amount in cents.
+  </ResponseField>
+  
+  <ResponseField name="price.interval" type="string">
+    Billing interval.
+  </ResponseField>
+  
+  <ResponseField name="price.interval_count" type="number">
+    Number of intervals between billings.
+  </ResponseField>
+  
+  <ResponseField name="price.display" type="object">
+    Display configuration for the price.
+    
+    <ResponseField name="price.display.primary_text" type="string">
+      Primary display text.
+    </ResponseField>
+    
+    <ResponseField name="price.display.secondary_text" type="string">
+      Secondary display text.
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Array of features included in the product.
+</ResponseField>
+
+<ResponseField name="free_trial" type="object | null">
+  Free trial configuration if enabled.
+  
+  <ResponseField name="free_trial.duration_length" type="number">
+    Length of the trial period.
+  </ResponseField>
+  
+  <ResponseField name="free_trial.duration_type" type="string">
+    Unit of time for the trial.
+  </ResponseField>
+  
+  <ResponseField name="free_trial.card_required" type="boolean">
+    Whether a credit card is required.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="created_at" type="number">
+  Unix timestamp when the product was created.
+</ResponseField>
+
+<ResponseField name="env" type="string">
+  Environment the product belongs to (e.g., `production`, `development`).
+</ResponseField>
+
+<ResponseField name="archived" type="boolean">
+  Whether the product is archived.
+</ResponseField>
+
+<ResponseField name="base_variant_id" type="string | null">
+  ID of the base variant if this is a product variant.
+</ResponseField>
+
+## Example Request
+
+```json
+{
+  "id": "premium-plan",
+  "name": "Premium Plan",
+  "description": "Full access to all premium features",
+  "group": "subscription-plans",
+  "price": {
+    "amount": 2999,
+    "interval": "month",
+    "interval_count": 1
+  },
+  "items": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "unlimited": false,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1
+      },
+      "price": {
+        "amount": 10,
+        "interval": "month",
+        "billing_units": 1000,
+        "billing_method": "usage_based"
+      }
+    }
+  ],
+  "free_trial": {
+    "duration_length": 14,
+    "duration_type": "day",
+    "card_required": true
+  }
+}
+```
+
+## Example Response
+
+```json
+{
+  "id": "premium-plan",
+  "name": "Premium Plan",
+  "description": "Full access to all premium features",
+  "group": "subscription-plans",
+  "version": 1,
+  "add_on": false,
+  "default": false,
+  "price": {
+    "amount": 2999,
+    "interval": "month",
+    "interval_count": 1
+  },
+  "features": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "unlimited": false,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1
+      },
+      "price": {
+        "amount": 10,
+        "interval": "month",
+        "billing_units": 1000,
+        "billing_method": "usage_based",
+        "max_purchase": null
+      }
+    }
+  ],
+  "free_trial": {
+    "duration_length": 14,
+    "duration_type": "day",
+    "card_required": true
+  },
+  "created_at": 1708272000,
+  "env": "production",
+  "archived": false,
+  "base_variant_id": null
+}
+```

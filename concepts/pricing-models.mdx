@@ -1,0 +1,547 @@
+---
+title: "Pricing Models"
+description: "Understanding subscription models, usage-based pricing, and billing configurations in Autumn"
+---
+
+## Overview
+
+Autumn supports multiple pricing models to fit different business needs. You can combine these models within a single product for flexible monetization strategies.
+
+## Core Pricing Models
+
+### 1. Fixed Subscription
+
+Simple recurring charge at a set interval:
+
+```typescript
+// From priceConfig/fixedPriceConfig.ts
+price: {
+  type: "fixed";
+  amount: 9900;              // $99.00
+  interval: "month";
+  interval_count: 1;
+}
+```
+
+**Use cases**:
+- Monthly/annual subscriptions
+- Flat-rate plans
+- Base platform fees
+
+**Example**: $99/month for Pro plan
+
+```json
+{
+  "price": {
+    "amount": 9900,
+    "interval": "month",
+    "interval_count": 1
+  }
+}
+```
+
+### 2. Usage-based Pricing
+
+Charge based on actual consumption:
+
+```typescript
+// From priceConfig/usagePriceConfig.ts
+price: {
+  type: "usage";
+  bill_when: "in_advance" | "start_of_period" | "end_of_period";
+  billing_units: 100;           // Bill per 100 units
+  internal_feature_id: string;
+  feature_id: string;
+  usage_tiers: [
+    { to: 10000, amount: 0 },     // First 10k free
+    { to: 50000, amount: 1000 },  // Next 40k: $10/1000
+    { to: "inf", amount: 500 }    // 50k+: $5/1000
+  ];
+  interval: "month";
+}
+```
+
+**Billing timing options**:
+
+<Tabs>
+  <Tab title="In Advance">
+    Charge at the start of the period for estimated usage:
+    
+    ```typescript
+    bill_when: "in_advance"
+    ```
+    
+    - Customer pre-pays for usage
+    - Autumn tracks actual usage
+    - True-up at end of period if needed
+  </Tab>
+  
+  <Tab title="Start of Period">
+    Charge at the start for the previous period's usage:
+    
+    ```typescript
+    bill_when: "start_of_period"
+    ```
+    
+    - Bill for last period's usage when new period starts
+    - Common for monthly metered billing
+  </Tab>
+  
+  <Tab title="End of Period (Arrears)">
+    Charge at the end of the period for actual usage:
+    
+    ```typescript
+    bill_when: "end_of_period"
+    ```
+    
+    - Bill after usage occurs
+    - More accurate, but requires customer trust
+    - Powered by Stripe Billing Meters
+  </Tab>
+</Tabs>
+
+### 3. Tiered Pricing
+
+Different per-unit prices at different volume thresholds:
+
+```typescript
+usage_tiers: [
+  { to: 1000, amount: 5000 },      // 0-1,000: $50 per 1,000
+  { to: 10000, amount: 3000 },     // 1,001-10,000: $30 per 1,000
+  { to: "inf", amount: 1000 }      // 10,001+: $10 per 1,000
+]
+```
+
+**Example billing**:
+- Customer uses 15,000 units
+- Tier 1 (1,000 units): 1,000 × $0.05 = $50
+- Tier 2 (9,000 units): 9,000 × $0.03 = $270
+- Tier 3 (5,000 units): 5,000 × $0.01 = $50
+- **Total**: $370
+
+<Note>
+  The `to` field is **exclusive**. `{ to: 1000 }` means "up to but not including 1000".
+</Note>
+
+### 4. Flat Amount Tiers
+
+Flat price per tier instead of per-unit:
+
+```typescript
+usage_tiers: [
+  { to: 1000, amount: 0 },       // 0-1,000: Free
+  { to: 10000, amount: 5000 },   // 1,001-10,000: $50 flat
+  { to: "inf", amount: 10000 }   // 10,001+: $100 flat
+]
+```
+
+**Example billing**:
+- Customer uses 500 units: $0
+- Customer uses 5,000 units: $50
+- Customer uses 25,000 units: $100
+
+### 5. Seat-based Pricing
+
+Charge per user, seat, or license:
+
+```typescript
+// In customer_product
+quantity: 5;  // 5 seats
+
+// In product price
+price: {
+  amount: 1000;  // $10 per seat
+  interval: "month";
+}
+
+// Total: 5 × $10 = $50/month
+```
+
+**Managing seats**:
+- Add seats via `/update-subscription`
+- Proration handled automatically
+- Can set max/min quantities
+
+### 6. Pay Upfront / Prepaid
+
+Customer pays in advance for credits or usage:
+
+```typescript
+// Customer buys 10,000 credits upfront
+{
+  "feature_id": "processing-credits",
+  "amount": 10000,
+  "price": 5000  // $50 for 10,000 credits
+}
+```
+
+**Characteristics**:
+- No recurring charge
+- Balance decrements as customer uses credits
+- Can offer volume discounts
+- Customer can top-up anytime
+
+### 7. Credit Systems
+
+Unified credits that work across multiple features:
+
+```typescript
+// Feature configuration
+{
+  "type": "credit_system",
+  "config": {
+    "credit_schema": [
+      { "metered_feature_id": "video-transcode", "credit_cost": 10 },
+      { "metered_feature_id": "image-process", "credit_cost": 1 },
+      { "metered_feature_id": "ai-generation", "credit_cost": 5 }
+    ]
+  }
+}
+```
+
+**Usage**:
+- Customer has 1,000 credits
+- Processes 5 videos: -50 credits
+- Processes 200 images: -200 credits
+- Runs 10 AI generations: -50 credits
+- Remaining: 700 credits
+
+## Combined Pricing Models
+
+Mix multiple models in a single product:
+
+```json
+{
+  "price": {
+    "amount": 4900,
+    "interval": "month"
+  },
+  "items": [
+    {
+      "feature_id": "api-calls",
+      "included": 100000,
+      "price": {
+        "amount": 50,
+        "billing_units": 1000,
+        "billing_method": "per_unit"
+      }
+    },
+    {
+      "feature_id": "storage-gb",
+      "included": 100,
+      "price": {
+        "amount": 100,
+        "billing_units": 1,
+        "billing_method": "per_unit"
+      }
+    },
+    {
+      "feature_id": "team-members",
+      "unlimited": true
+    }
+  ]
+}
+```
+
+This product includes:
+- **Base**: $49/month
+- **API calls**: 100k included, $0.05 per 1k after
+- **Storage**: 100 GB included, $1 per GB after
+- **Team members**: Unlimited
+
+## Billing Methods
+
+### Per Unit
+
+Bill for each unit or block of units consumed:
+
+```typescript
+billing_method: "per_unit";
+billing_units: 100;  // Bill per 100 units
+amount: 50;          // $0.50 per 100 units
+```
+
+**Example**: Customer uses 1,250 units
+- Rounds up to 1,300 (13 blocks of 100)
+- Charge: 13 × $0.50 = $6.50
+
+### Per Package
+
+Sell features in packages:
+
+```typescript
+billing_method: "per_package";
+billing_units: 1000;   // Sold in packages of 1,000
+amount: 1000;          // $10 per package
+```
+
+**Example**: Customer uses 2,500 units
+- Rounds up to 3,000 (3 packages)
+- Charge: 3 × $10 = $30
+
+## Overage Handling
+
+### Metered Overages
+
+Charge for usage beyond included allowance:
+
+```typescript
+{
+  "feature_id": "api-calls",
+  "included": 10000,      // 10k included
+  "price": {
+    "amount": 100,        // $1 per 1000 overage
+    "billing_units": 1000,
+    "billing_method": "per_unit"
+  }
+}
+```
+
+**Billing flow**:
+1. Customer uses 15,000 API calls
+2. 10,000 covered by base plan
+3. 5,000 overage → 5 units → $5 charged
+
+### Hard Limits
+
+Block usage after threshold:
+
+```typescript
+{
+  "allowance": 10000,
+  "usage_limit": 12000  // Block after 12k
+}
+```
+
+- Customer hits 12,000 usage
+- `/check` returns `access: false`
+- Prevent further usage until reset or upgrade
+
+### Soft Limits
+
+Warn but allow continued usage:
+
+```typescript
+{
+  "allowance": 10000,
+  // No usage_limit set
+}
+```
+
+- Customer exceeds 10,000
+- Usage continues
+- Overage charged per pricing configuration
+
+## Proration
+
+Autumn handles proration automatically when customers change plans:
+
+```typescript
+// From priceModels.ts
+proration_config: {
+  should_prorate: boolean;
+}
+```
+
+### Upgrade Mid-cycle
+
+**Scenario**: Customer upgrades from $49/month to $99/month on day 15 of 30
+
+1. Credit unused time: (15 days / 30 days) × $49 = $24.50
+2. Charge new plan: (15 days / 30 days) × $99 = $49.50
+3. **Net charge**: $49.50 - $24.50 = $25.00
+
+### Downgrade Mid-cycle
+
+**Scenario**: Customer downgrades from $99/month to $49/month on day 15 of 30
+
+1. Credit unused time: (15 days / 30 days) × $99 = $49.50
+2. Charge new plan: (15 days / 30 days) × $49 = $24.50
+3. **Credit balance**: $49.50 - $24.50 = $25.00 (applied to next invoice)
+
+### Proration Strategies
+
+<AccordionGroup>
+  <Accordion title="on_increase: prorated_immediately">
+    Charge prorated amount immediately on upgrade:
+    ```typescript
+    proration: {
+      on_increase: "prorated_immediately"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="on_increase: full_immediately">
+    Charge full amount immediately on upgrade:
+    ```typescript
+    proration: {
+      on_increase: "full_immediately"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="on_decrease: end_of_period">
+    Downgrade takes effect at period end:
+    ```typescript
+    proration: {
+      on_decrease: "end_of_period"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="on_decrease: prorated_immediately">
+    Credit prorated amount immediately on downgrade:
+    ```typescript
+    proration: {
+      on_decrease: "prorated_immediately"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Free Trials
+
+### Trial Configuration
+
+Products can include free trials:
+
+```typescript
+free_trial: {
+  duration_days: 14;  // 14-day trial
+}
+```
+
+### Trial Billing Behavior
+
+During the trial:
+- Customer has full access to entitlements
+- No charges occur
+- Usage is tracked
+- At trial end:
+  - Subscription activates
+  - First charge processes
+  - Usage resets (if configured)
+
+### Trial with Usage Tracking
+
+Track usage during trial for billing after:
+
+```typescript
+{
+  "free_trial": { "duration_days": 7 },
+  "items": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "price": {
+        "bill_when": "end_of_period"
+      }
+    }
+  ]
+}
+```
+
+Customer uses 5,000 API calls during 7-day trial. On day 8:
+- Trial ends
+- Subscription starts
+- Usage resets to 0
+- No retroactive charge for trial usage
+
+## Invoice Mode
+
+Autumn supports manual invoicing:
+
+```typescript
+// From invoiceModeParams.ts
+invoice_mode: {
+  enabled: true;
+  enable_plan_immediately: false;  // Don't activate until paid
+  finalize: true;                  // Auto-finalize invoice
+}
+```
+
+**Flow**:
+1. Create draft invoice
+2. Customer reviews
+3. Invoice finalized
+4. Customer pays
+5. Plan activates
+
+**Use cases**:
+- Enterprise sales
+- Custom pricing
+- Purchase orders
+- Manual approval workflows
+
+## Collection Methods
+
+### Charge Automatically
+
+Automatically charge payment method:
+
+```typescript
+// From cusProductTable.ts
+collection_method: "charge_automatically";  // Default
+```
+
+### Send Invoice
+
+Send invoice for manual payment:
+
+```typescript
+collection_method: "send_invoice";
+```
+
+Customer receives email with:
+- Invoice details
+- Payment link
+- Due date
+- Payment instructions
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start simple, add complexity gradually">
+    Begin with fixed pricing, add usage-based components as you learn customer behavior.
+  </Accordion>
+  
+  <Accordion title="Use tiered pricing for predictability">
+    Volume tiers help customers predict costs while rewarding higher usage.
+  </Accordion>
+  
+  <Accordion title="Set reasonable hard limits">
+    Protect infrastructure with `usage_limit` but set it high enough to avoid disrupting customers.
+  </Accordion>
+  
+  <Accordion title="Offer pay-as-you-go for flexibility">
+    Let customers avoid commitment with credit-based or pure usage pricing.
+  </Accordion>
+  
+  <Accordion title="Provide generous free tiers">
+    Help customers evaluate your product with meaningful trial allowances.
+  </Accordion>
+  
+  <Accordion title="Consider proration carefully">
+    Balance customer experience with revenue impact when configuring proration.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Products & Plans" icon="box" href="/concepts/products-and-plans">
+    Learn how to structure products
+  </Card>
+  
+  <Card title="Features & Entitlements" icon="key" href="/concepts/features-and-entitlements">
+    Configure feature access and limits
+  </Card>
+  
+  <Card title="Usage-based Billing Guide" icon="chart-line" href="/guides/usage-based-billing">
+    Implement metered billing
+  </Card>
+  
+  <Card title="Credit Systems Guide" icon="coins" href="/guides/credit-systems">
+    Build a credit-based pricing model
+  </Card>
+</CardGroup>

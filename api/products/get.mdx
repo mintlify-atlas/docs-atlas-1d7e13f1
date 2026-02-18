@@ -1,0 +1,298 @@
+---
+title: 'Get Product'
+openapi: 'GET /plans/{plan_id}'
+---
+
+Retrieves a specific product (plan) by its ID. Returns all configuration details including pricing, features, and trial settings.
+
+## Path Parameters
+
+<ParamField path="plan_id" type="string" required>
+  The unique identifier of the product to retrieve.
+  
+  ```
+  premium-plan
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the product.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Display name of the product.
+</ResponseField>
+
+<ResponseField name="description" type="string | null">
+  Description of the product.
+</ResponseField>
+
+<ResponseField name="group" type="string | null">
+  Product group identifier for organizing related products.
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Version number of the product. Increments with each update.
+</ResponseField>
+
+<ResponseField name="add_on" type="boolean">
+  Whether this product is an add-on that can be attached to other products.
+</ResponseField>
+
+<ResponseField name="default" type="boolean">
+  Whether this is the default product for new customers.
+</ResponseField>
+
+<ResponseField name="price" type="object | null">
+  Base price configuration for the product.
+  
+  <ResponseField name="price.amount" type="number">
+    Price amount in cents (e.g., 2999 for $29.99).
+  </ResponseField>
+  
+  <ResponseField name="price.interval" type="string">
+    Billing interval. One of: `one_off`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+  </ResponseField>
+  
+  <ResponseField name="price.interval_count" type="number">
+    Number of intervals between billings. For example, `interval=month` and `interval_count=3` bills every 3 months.
+  </ResponseField>
+  
+  <ResponseField name="price.display" type="object">
+    Optional display configuration for custom price formatting.
+    
+    <ResponseField name="price.display.primary_text" type="string">
+      Primary text to display for the price.
+    </ResponseField>
+    
+    <ResponseField name="price.display.secondary_text" type="string">
+      Secondary text to display for the price.
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="features" type="array">
+  Array of features (product items) included in this product.
+  
+  <ResponseField name="features[].feature_id" type="string">
+    ID of the feature.
+  </ResponseField>
+  
+  <ResponseField name="features[].included" type="number">
+    Amount of the feature included in the product.
+  </ResponseField>
+  
+  <ResponseField name="features[].unlimited" type="boolean">
+    Whether the feature has unlimited usage.
+  </ResponseField>
+  
+  <ResponseField name="features[].reset" type="object | null">
+    Reset configuration for usage limits.
+    
+    <ResponseField name="features[].reset.interval" type="string">
+      Reset interval. One of: `one_off`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+    </ResponseField>
+    
+    <ResponseField name="features[].reset.interval_count" type="number">
+      Number of intervals between resets.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="features[].price" type="object | null">
+    Pricing configuration for this feature.
+    
+    <ResponseField name="features[].price.amount" type="number">
+      Flat price per billing unit (only present for flat-rate pricing).
+    </ResponseField>
+    
+    <ResponseField name="features[].price.tiers" type="array">
+      Tiered pricing structure (only present for tiered pricing). Each tier contains:
+      - `to`: Upper bound of the tier
+      - `amount`: Price per unit in this tier
+    </ResponseField>
+    
+    <ResponseField name="features[].price.interval" type="string">
+      Billing interval for this feature.
+    </ResponseField>
+    
+    <ResponseField name="features[].price.interval_count" type="number">
+      Number of intervals between billings.
+    </ResponseField>
+    
+    <ResponseField name="features[].price.billing_units" type="number">
+      Number of units billed together (e.g., 1000 for per-thousand pricing).
+    </ResponseField>
+    
+    <ResponseField name="features[].price.billing_method" type="string">
+      Billing method. One of: `prepaid`, `usage_based`.
+    </ResponseField>
+    
+    <ResponseField name="features[].price.max_purchase" type="number | null">
+      Maximum number of units that can be purchased.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="features[].display" type="object">
+    Display configuration for the feature.
+    
+    <ResponseField name="features[].display.primary_text" type="string">
+      Primary display text.
+    </ResponseField>
+    
+    <ResponseField name="features[].display.secondary_text" type="string">
+      Secondary display text.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="features[].rollover" type="object">
+    Rollover configuration for unused usage.
+    
+    <ResponseField name="features[].rollover.max" type="number | null">
+      Maximum amount that can rollover to the next period.
+    </ResponseField>
+    
+    <ResponseField name="features[].rollover.expiry_duration_type" type="string">
+      Duration type for rollover expiry.
+    </ResponseField>
+    
+    <ResponseField name="features[].rollover.expiry_duration_length" type="number">
+      Length of expiry duration.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="features[].proration" type="object">
+    Proration behavior when the product is changed mid-cycle.
+    
+    <ResponseField name="features[].proration.on_increase" type="string">
+      Behavior on upgrade. One of: `bill_immediately`, `prorate_immediately`, `prorate_next_cycle`, `bill_next_cycle`.
+    </ResponseField>
+    
+    <ResponseField name="features[].proration.on_decrease" type="string">
+      Behavior on downgrade. One of: `prorate`, `prorate_immediately`, `prorate_next_cycle`, `none`, `no_prorations`.
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="free_trial" type="object | null">
+  Free trial configuration if enabled.
+  
+  <ResponseField name="free_trial.duration_length" type="number">
+    Length of the free trial period.
+  </ResponseField>
+  
+  <ResponseField name="free_trial.duration_type" type="string">
+    Unit of time for the trial duration. One of: `day`, `month`, `year`.
+  </ResponseField>
+  
+  <ResponseField name="free_trial.card_required" type="boolean">
+    Whether a credit card is required to start the trial.
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="created_at" type="number">
+  Unix timestamp when the product was created.
+</ResponseField>
+
+<ResponseField name="env" type="string">
+  Environment the product belongs to (e.g., `production`, `development`).
+</ResponseField>
+
+<ResponseField name="archived" type="boolean">
+  Whether the product is archived and hidden from customers.
+</ResponseField>
+
+<ResponseField name="base_variant_id" type="string | null">
+  ID of the base variant if this is a product variant. `null` for base products.
+</ResponseField>
+
+<ResponseField name="customer_eligibility" type="object">
+  Customer eligibility information (only present when queried with a specific customer context).
+  
+  <ResponseField name="customer_eligibility.trial_available" type="boolean">
+    Whether the free trial is available for this customer.
+  </ResponseField>
+  
+  <ResponseField name="customer_eligibility.scenario" type="string">
+    Attachment scenario for this customer.
+  </ResponseField>
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "id": "premium-plan",
+  "name": "Premium Plan",
+  "description": "Full access to all premium features",
+  "group": "subscription-plans",
+  "version": 1,
+  "add_on": false,
+  "default": false,
+  "price": {
+    "amount": 2999,
+    "interval": "month",
+    "interval_count": 1,
+    "display": {
+      "primary_text": "$29.99/month",
+      "secondary_text": "Billed monthly"
+    }
+  },
+  "features": [
+    {
+      "feature_id": "api-calls",
+      "included": 10000,
+      "unlimited": false,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1
+      },
+      "price": {
+        "amount": 10,
+        "interval": "month",
+        "interval_count": 1,
+        "billing_units": 1000,
+        "billing_method": "usage_based",
+        "max_purchase": null
+      },
+      "display": {
+        "primary_text": "10,000 API calls included",
+        "secondary_text": "$10 per 1,000 additional calls"
+      }
+    },
+    {
+      "feature_id": "storage",
+      "included": 100,
+      "unlimited": false,
+      "reset": null,
+      "price": {
+        "tiers": [
+          { "to": 100, "amount": 0 },
+          { "to": 500, "amount": 5 },
+          { "to": "infinite", "amount": 3 }
+        ],
+        "interval": "month",
+        "interval_count": 1,
+        "billing_units": 1,
+        "billing_method": "usage_based",
+        "max_purchase": null
+      },
+      "rollover": {
+        "max": 50,
+        "expiry_duration_type": "month",
+        "expiry_duration_length": 1
+      }
+    }
+  ],
+  "free_trial": {
+    "duration_length": 14,
+    "duration_type": "day",
+    "card_required": true
+  },
+  "created_at": 1708272000,
+  "env": "production",
+  "archived": false,
+  "base_variant_id": null
+}
+```

@@ -1,0 +1,131 @@
+---
+title: 'Delete Product'
+openapi: 'DELETE /plans/{plan_id}'
+---
+
+Deletes a product (plan) from your Autumn environment. By default, only deletes the latest version. Use `all_versions=true` to delete all versions of the product.
+
+<Warning>
+  Deleting a product cannot be undone. Consider archiving the product instead if you want to hide it from customers while preserving historical data.
+</Warning>
+
+## Path Parameters
+
+<ParamField path="plan_id" type="string" required>
+  The unique identifier of the product to delete.
+  
+  ```
+  premium-plan
+  ```
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="all_versions" type="boolean">
+  If `true`, deletes all versions of the product. If `false` or omitted, only deletes the latest version.
+  
+  ```
+  true
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the deletion was successful.
+  
+  ```json
+  true
+  ```
+</ResponseField>
+
+## Example Requests
+
+### Delete latest version only
+
+```bash
+DELETE /plans/premium-plan
+```
+
+### Delete all versions
+
+```bash
+DELETE /plans/premium-plan?all_versions=true
+```
+
+## Example Response
+
+```json
+{
+  "success": true
+}
+```
+
+## Behavior
+
+### Single version deletion (default)
+
+When `all_versions` is `false` or omitted:
+- Only the latest version of the product is deleted
+- Previous versions remain in the system
+- Customers on older versions are not affected
+- The product ID can still be used to access older versions
+
+### All versions deletion
+
+When `all_versions=true`:
+- All versions of the product are deleted
+- The product ID is completely removed from the system
+- Customers on any version of this product will need to be migrated to a different product
+- Any subscriptions using this product may be affected
+
+## Considerations
+
+<Warning>
+  **Active subscriptions**: Check if any customers are actively subscribed to this product before deletion. Deleting a product with active subscriptions may cause issues with billing and entitlements.
+</Warning>
+
+### Before deleting a product
+
+1. **Check for active subscriptions**: Verify that no customers are currently subscribed to this product or any of its versions.
+2. **Migrate customers**: If customers are using this product, migrate them to a different product first.
+3. **Consider archiving**: Instead of deleting, you can update the product with `archived: true` to hide it from new customers while preserving historical data.
+
+### Alternative to deletion
+
+If you want to hide a product from customers without deleting it:
+
+```bash
+POST /plans/premium-plan
+Content-Type: application/json
+
+{
+  "archived": true
+}
+```
+
+Archived products:
+- Are hidden from product listings
+- Cannot be attached to new customers
+- Preserve all historical data
+- Can be unarchived later if needed
+
+## Error Responses
+
+### Product not found
+
+```json
+{
+  "message": "Product not found",
+  "code": "not_found"
+}
+```
+
+### Product has active subscriptions
+
+```json
+{
+  "message": "Cannot delete product with active subscriptions",
+  "code": "product_in_use"
+}
+```

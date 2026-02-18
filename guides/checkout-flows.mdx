@@ -1,0 +1,739 @@
+---
+title: "Checkout Flows"
+description: "Implement secure payment flows with Stripe Checkout integration"
+---
+
+## Overview
+
+Autumn provides seamless checkout integration with Stripe, handling payment collection, subscription setup, and payment method management automatically.
+
+## When to Use Checkout
+
+- **New customer signup**: Customer doesn't have a payment method
+- **Payment method setup**: Collect payment information
+- **Plan upgrades**: Upgrade requires payment method on file
+- **Self-service purchases**: Credit packs, add-ons, one-time purchases
+
+## Basic Checkout Flow
+
+<Steps>
+  <Step title="Create checkout session">
+    Use `/checkout` to generate a Stripe Checkout URL:
+
+    ```typescript
+    const createCheckout = async (customerId: string, planId: string) => {
+      const response = await fetch('https://api.useautumn.com/checkout', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          product_id: planId,
+          success_url: 'https://yourapp.com/success',
+          customer_data: {
+            email: 'customer@example.com',
+            name: 'John Doe'
+          }
+        })
+      });
+
+      const data = await response.json();
+      return data.checkout_url;
+    };
+    ```
+  </Step>
+
+  <Step title="Redirect to checkout">
+    Send the customer to the Stripe Checkout page:
+
+    ```typescript
+    const checkoutUrl = await createCheckout('cus_123', 'pro_plan');
+    window.location.href = checkoutUrl;
+    ```
+  </Step>
+
+  <Step title="Handle success">
+    Process the successful payment on your success page:
+
+    ```typescript
+    // On success page (success_url)
+    const handleSuccess = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session_id');
+
+      // Verify the subscription is active
+      const response = await fetch('/api/verify-subscription', {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId })
+      });
+
+      const data = await response.json();
+      
+      if (data.active) {
+        // Grant access to the product
+        window.location.href = '/dashboard';
+      }
+    };
+    ```
+  </Step>
+
+  <Step title="Listen for webhooks">
+    Handle subscription events via webhooks:
+
+    ```typescript
+    app.post('/webhooks/autumn', async (req, res) => {
+      const event = req.body;
+
+      switch (event.type) {
+        case 'checkout.completed':
+          // Customer completed checkout
+          await activateSubscription(event.data.customer_id);
+          break;
+
+        case 'subscription.created':
+          // New subscription created
+          await grantAccess(event.data.customer_id);
+          break;
+
+        case 'invoice.payment_succeeded':
+          // Payment succeeded
+          await sendReceipt(event.data.customer_email);
+          break;
+      }
+
+      res.json({ received: true });
+    });
+    ```
+  </Step>
+</Steps>
+
+## Checkout vs Attach
+
+### Use `/checkout` when:
+- Customer is new and has no payment method
+- You want Stripe's hosted checkout page
+- You need payment method collection
+- Selling one-time purchases or credit packs
+
+### Use `/attach` when:
+- Customer already has a payment method
+- Upgrading/downgrading existing subscription
+- Immediate charge (no checkout UI needed)
+- Internal subscription management
+
+```typescript
+const smartAttach = async (customerId: string, planId: string) => {
+  // Try attach first
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId,
+      success_url: 'https://yourapp.com/success'
+    })
+  });
+
+  const data = await response.json();
+
+  if (data.checkout_url) {
+    // No payment method - redirect to checkout
+    window.location.href = data.checkout_url;
+  } else {
+    // Payment method exists - subscription created immediately
+    console.log('Subscription active:', data);
+    return data;
+  }
+};
+```
+
+## Payment Setup Mode
+
+Collect payment method without immediate charge:
+
+```typescript
+const setupPaymentMethod = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: 'pro_plan',
+      setup_payment: true,  // Only collect payment method
+      success_url: 'https://yourapp.com/payment-added'
+    })
+  });
+
+  const data = await response.json();
+  return data.checkout_url;
+};
+
+// Use case: Add payment method before free trial ends
+const addPaymentMethod = async () => {
+  const checkoutUrl = await setupPaymentMethod('cus_123');
+  window.location.href = checkoutUrl;
+};
+```
+
+<Note>
+  When `setup_payment: true`, the customer adds a payment method but isn't charged immediately. The subscription will charge when the free trial ends.
+</Note>
+
+## Customizing Checkout
+
+### Pre-fill Customer Data
+
+```typescript
+const checkoutWithData = async ({
+  customerId,
+  planId,
+  customerInfo
+}: {
+  customerId: string;
+  planId: string;
+  customerInfo: {
+    email: string;
+    name: string;
+    phone?: string;
+  };
+}) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId,
+      customer_data: customerInfo,
+      success_url: 'https://yourapp.com/success?session_id={CHECKOUT_SESSION_ID}'
+    })
+  });
+
+  return await response.json();
+};
+
+// Pre-fill checkout form
+await checkoutWithData({
+  customerId: 'cus_new',
+  planId: 'pro_plan',
+  customerInfo: {
+    email: 'john@example.com',
+    name: 'John Doe',
+    phone: '+1234567890'
+  }
+});
+```
+
+### Custom Checkout Parameters
+
+Pass additional Stripe Checkout parameters:
+
+```typescript
+const customCheckout = async (customerId: string, planId: string) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId,
+      success_url: 'https://yourapp.com/success',
+      checkout_session_params: {
+        allow_promotion_codes: true,  // Enable promo codes
+        billing_address_collection: 'required',  // Require billing address
+        phone_number_collection: {
+          enabled: true
+        },
+        tax_id_collection: {
+          enabled: true  // Collect tax ID
+        },
+        automatic_tax: {
+          enabled: true  // Calculate tax automatically
+        }
+      }
+    })
+  });
+
+  return await response.json();
+};
+```
+
+## Free Trials with Checkout
+
+### Start Trial with Payment Collection
+
+```typescript
+const startTrialWithPayment = async (customerId: string, planId: string) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId,
+      free_trial: true,  // Enable trial
+      setup_payment: true,  // Collect payment for after trial
+      success_url: 'https://yourapp.com/trial-started'
+    })
+  });
+
+  return await response.json();
+};
+
+// Customer adds payment method but won't be charged for 14 days
+await startTrialWithPayment('cus_new', 'pro_plan');
+```
+
+### Trial Without Payment Method
+
+```typescript
+const startTrialNoPm = async (customerId: string, planId: string) => {
+  // Use attach instead of checkout for trial without payment
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: planId,
+      free_trial: true
+    })
+  });
+
+  return await response.json();
+};
+
+// Trial starts immediately, no payment required
+await startTrialNoPm('cus_new', 'pro_plan');
+```
+
+<Warning>
+  Starting trials without payment collection increases trial-to-paid conversion friction. Collect payment method during signup for better conversion.
+</Warning>
+
+## Error Handling
+
+### Handle Checkout Errors
+
+```typescript
+const safeCheckout = async (customerId: string, planId: string) => {
+  try {
+    const response = await fetch('https://api.useautumn.com/checkout', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        product_id: planId,
+        success_url: 'https://yourapp.com/success',
+        cancel_url: 'https://yourapp.com/cancelled'  // User cancels checkout
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Checkout failed');
+    }
+
+    const data = await response.json();
+    return data.checkout_url;
+  } catch (error) {
+    console.error('Checkout error:', error);
+    
+    // Show user-friendly error
+    if (error.message.includes('product_not_found')) {
+      throw new Error('This plan is no longer available');
+    } else if (error.message.includes('customer_not_found')) {
+      throw new Error('Account not found. Please contact support.');
+    } else {
+      throw new Error('Unable to start checkout. Please try again.');
+    }
+  }
+};
+```
+
+### Payment Failed on Checkout
+
+```typescript
+// Handle failed payment on success page
+const checkPaymentStatus = async (sessionId: string) => {
+  const response = await fetch(
+    `/api/checkout/status?session_id=${sessionId}`
+  );
+  const data = await response.json();
+
+  if (data.payment_status === 'failed') {
+    // Show error message
+    alert('Payment failed. Please try again or use a different payment method.');
+    
+    // Redirect back to pricing
+    window.location.href = '/pricing';
+  } else if (data.payment_status === 'succeeded') {
+    // Success - activate subscription
+    await activateSubscription(data.customer_id);
+  }
+};
+```
+
+## One-Time Purchases
+
+Sell credits, add-ons, or one-time products:
+
+```typescript
+const buyCredits = async (customerId: string, creditPackId: string) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: creditPackId,  // One-time product
+      success_url: 'https://yourapp.com/credits-added'
+    })
+  });
+
+  const data = await response.json();
+  return data.checkout_url;
+};
+
+// Purchase credit pack
+const checkoutUrl = await buyCredits('cus_123', 'credits_1000');
+window.location.href = checkoutUrl;
+```
+
+## Multiple Products Checkout
+
+Checkout with multiple products at once:
+
+```typescript
+const checkoutBundle = async (customerId: string, productIds: string[]) => {
+  const response = await fetch('https://api.useautumn.com/checkout', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_ids: productIds,  // Array of products
+      success_url: 'https://yourapp.com/success'
+    })
+  });
+
+  return await response.json();
+};
+
+// Checkout with base plan + add-ons
+await checkoutBundle('cus_new', [
+  'pro_plan',
+  'addon_storage',
+  'addon_support'
+]);
+```
+
+## Checkout UI Component
+
+```tsx
+import React, { useState } from 'react';
+
+interface CheckoutButtonProps {
+  customerId: string;
+  planId: string;
+  planName: string;
+  price: number;
+  interval: string;
+}
+
+const CheckoutButton: React.FC<CheckoutButtonProps> = ({
+  customerId,
+  planId,
+  planName,
+  price,
+  interval
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCheckout = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          product_id: planId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout');
+      }
+
+      const data = await response.json();
+      
+      if (data.checkout_url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.checkout_url;
+      } else {
+        // Subscription activated immediately
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="checkout-card">
+      <h3>{planName}</h3>
+      <div className="price">
+        <span className="amount">${price / 100}</span>
+        <span className="interval">/{interval}</span>
+      </div>
+      
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+      
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+        className="checkout-button"
+      >
+        {loading ? 'Loading...' : 'Subscribe Now'}
+      </button>
+      
+      <p className="terms">
+        By subscribing, you agree to our Terms of Service
+      </p>
+    </div>
+  );
+};
+
+export default CheckoutButton;
+```
+
+## Success Page Implementation
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+const CheckoutSuccess: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const sessionId = searchParams.get('session_id');
+
+  useEffect(() => {
+    verifyCheckout();
+  }, [sessionId]);
+
+  const verifyCheckout = async () => {
+    try {
+      const response = await fetch('/api/checkout/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      });
+
+      const data = await response.json();
+
+      if (data.subscription_active) {
+        setStatus('success');
+        
+        // Redirect to dashboard after 3 seconds
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 3000);
+      } else {
+        setStatus('error');
+      }
+    } catch (error) {
+      console.error('Verification failed:', error);
+      setStatus('error');
+    }
+  };
+
+  if (status === 'loading') {
+    return (
+      <div className="success-page">
+        <div className="spinner">Verifying payment...</div>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="success-page error">
+        <h1>Payment Verification Failed</h1>
+        <p>There was an issue verifying your payment. Please contact support.</p>
+        <button onClick={() => window.location.href = '/support'}>
+          Contact Support
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="success-page">
+      <div className="success-icon">✓</div>
+      <h1>Payment Successful!</h1>
+      <p>Your subscription is now active.</p>
+      <p className="redirect-message">
+        Redirecting to dashboard...
+      </p>
+    </div>
+  );
+};
+
+export default CheckoutSuccess;
+```
+
+## Webhook Integration
+
+```typescript
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+app.post('/webhooks/autumn', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.AUTUMN_WEBHOOK_SECRET;
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      webhookSecret
+    );
+  } catch (err: any) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      await handleCheckoutComplete(session);
+      break;
+
+    case 'customer.subscription.created':
+      const subscription = event.data.object;
+      await handleSubscriptionCreated(subscription);
+      break;
+
+    case 'invoice.payment_succeeded':
+      const invoice = event.data.object;
+      await handlePaymentSuccess(invoice);
+      break;
+
+    case 'invoice.payment_failed':
+      const failedInvoice = event.data.object;
+      await handlePaymentFailure(failedInvoice);
+      break;
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
+const handleCheckoutComplete = async (session: any) => {
+  const customerId = session.client_reference_id;
+  
+  // Activate subscription
+  await db.customers.update(customerId, {
+    subscription_active: true,
+    stripe_customer_id: session.customer,
+    subscribed_at: new Date()
+  });
+
+  // Send welcome email
+  await sendEmail({
+    to: session.customer_email,
+    subject: 'Welcome to Pro!',
+    template: 'welcome',
+    data: { customer_id: customerId }
+  });
+};
+```
+
+## Best Practices
+
+<Tip>
+  **Always use HTTPS**: Checkout URLs require secure connections. Never test with http:// in production.
+</Tip>
+
+<Warning>
+  **Verify payments server-side**: Never trust client-side success indicators. Always verify via webhook or API call.
+</Warning>
+
+<Note>
+  **Handle cancellations gracefully**: Provide a good `cancel_url` experience so users can try again.
+</Note>
+
+### Conversion Optimization
+
+1. **Pre-fill data**: Reduce friction by pre-filling known customer info
+2. **Clear pricing**: Show exactly what the customer will pay
+3. **Trust signals**: Display security badges, testimonials
+4. **Mobile optimized**: Stripe Checkout is mobile-friendly by default
+5. **Fast redirects**: Minimize delay between click and checkout page
+
+### Security
+
+1. **Verify webhooks**: Always verify webhook signatures
+2. **Use HTTPS**: Required for production checkouts
+3. **Validate session**: Check session ID on success page
+4. **Rate limiting**: Prevent checkout spam
+5. **Monitor fraud**: Watch for suspicious patterns
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Subscriptions" icon="rotate" href="/guides/managing-subscriptions">
+    Handle subscription lifecycle
+  </Card>
+  
+  <Card title="Webhooks" icon="webhook" href="/concepts/webhooks">
+    Process subscription events
+  </Card>
+  
+  <Card title="Checkout API" icon="code" href="/api/core/checkout">
+    Complete API documentation
+  </Card>
+  
+  <Card title="Custom Pricing" icon="dollar-sign" href="/guides/custom-pricing">
+    Enterprise pricing strategies
+  </Card>
+</CardGroup>

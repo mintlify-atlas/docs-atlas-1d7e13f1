@@ -1,0 +1,87 @@
+---
+title: 'List Features'
+openapi: 'GET /features'
+---
+
+Retrieve a list of all features in your workspace. By default, archived features are excluded.
+
+## Response
+
+<ResponseField name="list" type="array">
+  Array of feature objects
+  
+  <Expandable title="Feature Object">
+    <ResponseField name="id" type="string">
+      The ID of the feature
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The name of the feature
+    </ResponseField>
+    
+    <ResponseField name="type" type="enum">
+      The type: `single_use`, `continuous_use`, or `credit_system`
+    </ResponseField>
+    
+    <ResponseField name="consumable" type="boolean">
+      Whether the feature is consumable
+    </ResponseField>
+    
+    <ResponseField name="event_names" type="array">
+      Array of event names
+    </ResponseField>
+    
+    <ResponseField name="credit_schema" type="array">
+      Credit schema for credit_system features
+    </ResponseField>
+    
+    <ResponseField name="display" type="object">
+      Display names
+      
+      <Expandable title="Display">
+        <ResponseField name="singular" type="string">
+          Singular display name
+        </ResponseField>
+        
+        <ResponseField name="plural" type="string">
+          Plural display name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="archived" type="boolean">
+      Whether the feature is archived
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```json Response
+{
+  "list": [
+    {
+      "id": "api_calls",
+      "name": "API Calls",
+      "type": "single_use",
+      "consumable": true,
+      "display": {
+        "singular": "API Call",
+        "plural": "API Calls"
+      },
+      "archived": false
+    },
+    {
+      "id": "seats",
+      "name": "Seats",
+      "type": "continuous_use",
+      "consumable": false,
+      "display": {
+        "singular": "Seat",
+        "plural": "Seats"
+      },
+      "archived": false
+    }
+  ]
+}
+```

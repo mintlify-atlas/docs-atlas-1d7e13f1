@@ -1,0 +1,380 @@
+---
+title: 'Support'
+description: 'Get help with Autumn'
+---
+
+## Overview
+
+We're here to help you succeed with Autumn. Whether you're debugging an issue, looking for implementation advice, or just have questions, we offer multiple support channels.
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/STqxY92zuS">
+    Real-time help from the Autumn team and community
+  </Card>
+  
+  <Card title="Email Support" icon="envelope" href="mailto:hey@useautumn.com">
+    Direct support at hey@useautumn.com
+  </Card>
+</CardGroup>
+
+---
+
+## Discord Community
+
+<Note>
+  Discord is typically our **most responsive** support channel. Join us at [discord.gg/STqxY92zuS](https://discord.gg/STqxY92zuS)
+</Note>
+
+Our Discord server includes:
+
+<AccordionGroup>
+  <Accordion title="#support" icon="life-ring">
+    Get help with implementation, debugging, and technical questions. The Autumn team actively monitors this channel.
+  </Accordion>
+
+  <Accordion title="#show-and-tell" icon="image">
+    Share what you've built with Autumn. We love seeing creative implementations!
+  </Accordion>
+
+  <Accordion title="#feature-requests" icon="lightbulb">
+    Suggest new features or improvements. We actively consider community feedback for our roadmap.
+  </Accordion>
+
+  <Accordion title="#bug-reports" icon="bug">
+    Report bugs and issues. Include error messages, code snippets, and steps to reproduce.
+  </Accordion>
+
+  <Accordion title="#announcements" icon="bullhorn">
+    Stay updated on new releases, features, and important changes.
+  </Accordion>
+</AccordionGroup>
+
+### Getting the Most from Discord
+
+<Steps>
+  <Step title="Search First">
+    Check if your question has been answered before. Use Discord's search to find previous discussions.
+  </Step>
+
+  <Step title="Provide Context">
+    Include relevant details:
+    - What you're trying to achieve
+    - What you've tried
+    - Error messages or unexpected behavior
+    - Code snippets (use code blocks!)
+  </Step>
+
+  <Step title="Be Patient">
+    While we're usually quick to respond, sometimes it may take a few hours. We're a small team across different timezones.
+  </Step>
+</Steps>
+
+---
+
+## Email Support
+
+**Email:** [hey@useautumn.com](mailto:hey@useautumn.com)
+
+Email is great for:
+- Account-specific issues
+- Billing questions
+- Security concerns
+- Private/sensitive matters
+- Enterprise inquiries
+
+<Note>
+  We aim to respond to all emails within 24 hours during business days.
+</Note>
+
+### What to Include in Your Email
+
+To help us assist you quickly, please include:
+
+<AccordionGroup>
+  <Accordion title="Subject Line" icon="heading">
+    Clear, descriptive subject line (e.g., "API returns 500 on /check endpoint" instead of "Help needed")
+  </Accordion>
+
+  <Accordion title="Account Information" icon="user">
+    - Your organization ID (if applicable)
+    - Environment (test/live)
+    - Self-hosted or cloud version
+  </Accordion>
+
+  <Accordion title="Issue Details" icon="list">
+    - What you're trying to do
+    - What's happening vs. what you expected
+    - Steps to reproduce
+    - Error messages or logs
+  </Accordion>
+
+  <Accordion title="Code Snippets" icon="code">
+    Include relevant code (sanitize API keys!):
+    ```typescript
+    const response = await check({ 
+      featureId: 'ai_tokens',
+      customerId: 'cus_123' 
+    });
+    // Returns 500 error
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## GitHub Issues
+
+**Repository:** [github.com/useautumn/autumn](https://github.com/useautumn/autumn)
+
+GitHub Issues are ideal for:
+
+<CardGroup cols={2}>
+  <Card title="Bug Reports" icon="bug" href="https://github.com/useautumn/autumn/issues/new">
+    Report bugs with detailed reproduction steps
+  </Card>
+  
+  <Card title="Feature Requests" icon="sparkles" href="https://github.com/useautumn/autumn/issues/new">
+    Propose new features or enhancements
+  </Card>
+</CardGroup>
+
+### Creating a Good Issue
+
+<Tabs>
+  <Tab title="Bug Report">
+    ```markdown
+    ## Description
+    Brief description of the bug
+    
+    ## Steps to Reproduce
+    1. Call `/v1/check` with feature_id "ai_tokens"
+    2. Observe 500 error response
+    
+    ## Expected Behavior
+    Should return { allowed: true/false }
+    
+    ## Actual Behavior
+    Returns 500 Internal Server Error
+    
+    ## Environment
+    - Autumn version: Self-hosted main branch
+    - Node version: 20.x
+    - OS: macOS 14
+    
+    ## Additional Context
+    Error logs, screenshots, etc.
+    ```
+  </Tab>
+  
+  <Tab title="Feature Request">
+    ```markdown
+    ## Feature Description
+    Clear description of the proposed feature
+    
+    ## Use Case
+    Why is this feature needed? What problem does it solve?
+    
+    ## Proposed Solution
+    How you envision this working
+    
+    ## Alternatives Considered
+    Other approaches you've thought about
+    
+    ## Additional Context
+    Any other relevant information
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Documentation
+
+Before reaching out for support, check if your question is answered in our documentation:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with Autumn in minutes
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Complete API endpoint documentation
+  </Card>
+  
+  <Card title="Concepts" icon="lightbulb" href="/concepts">
+    Understand core Autumn concepts
+  </Card>
+  
+  <Card title="FAQ" icon="question" href="/community/faq">
+    Frequently asked questions
+  </Card>
+</CardGroup>
+
+---
+
+## Ask DeepWiki
+
+<Note>
+  Try [DeepWiki](https://deepwiki.com/useautumn/autumn) - an AI-powered tool that can answer questions about Autumn's codebase and documentation.
+</Note>
+
+---
+
+## Social Media
+
+Follow us for updates and community content:
+
+<CardGroup cols={2}>
+  <Card title="Twitter/X" icon="x-twitter" href="https://x.com/autumnpricing">
+    @autumnpricing - Product updates and news
+  </Card>
+  
+  <Card title="Y Combinator" icon="y" href="https://www.ycombinator.com/companies/autumn">
+    View our YC profile and news
+  </Card>
+</CardGroup>
+
+---
+
+## Self-Hosted Support
+
+### Community Support
+
+For self-hosted deployments, community support is available via:
+- Discord #self-hosted channel
+- GitHub Issues
+- GitHub Discussions
+
+### Enterprise Support
+
+For enterprise customers with SLAs and dedicated support:
+
+<Card title="Contact Sales" icon="building" href="mailto:hey@useautumn.com">
+  Email hey@useautumn.com to discuss enterprise support options
+</Card>
+
+Enterprise support includes:
+- Dedicated Slack channel
+- Priority support with SLA guarantees
+- Architecture review and consultation
+- Custom feature development
+- Training and onboarding
+
+---
+
+## Support Hours
+
+<ParamField path="Discord" type="Community-driven">
+  24/7 community support. Team typically responds during US business hours (9am-6pm PT).
+</ParamField>
+
+<ParamField path="Email" type="Business hours">
+  Responses within 24 hours on business days (Monday-Friday).
+</ParamField>
+
+<ParamField path="GitHub" type="Async">
+  Issues triaged and responded to within 48 hours.
+</ParamField>
+
+<Note>
+  For critical production issues affecting paying customers, email us at hey@useautumn.com with "[URGENT]" in the subject line.
+</Note>
+
+---
+
+## Common Issues
+
+Quick solutions to common problems:
+
+<AccordionGroup>
+  <Accordion title="API Key Authentication Failing" icon="key">
+    **Check:**
+    - API key includes full prefix (`am_sk_test_` or `am_sk_live_`)
+    - Authorization header format: `Bearer your_key_here`
+    - Key hasn't been revoked
+    - Using correct environment (test vs live)
+    
+    See [Authentication](/resources/authentication) for details.
+  </Accordion>
+
+  <Accordion title="Rate Limit Exceeded" icon="gauge">
+    **Solutions:**
+    - Implement exponential backoff
+    - Cache frequently accessed data
+    - Batch operations when possible
+    - Contact us for higher limits
+    
+    See [Rate Limits](/resources/rate-limits) for details.
+  </Accordion>
+
+  <Accordion title="Database Connection Issues" icon="database">
+    **Check:**
+    - `DATABASE_URL` in `server/.env` is correct
+    - Database is accessible from your environment
+    - Tables have been created with `bun db:push`
+    - Firewall rules allow connections
+  </Accordion>
+
+  <Accordion title="Webhook Not Receiving Events" icon="webhook">
+    **Check:**
+    - Localtunnel is running (in Docker Compose)
+    - `STRIPE_WEBHOOK_URL` is set correctly
+    - Stripe webhook endpoint is registered
+    - Webhook signature verification is working
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Response Time Expectations
+
+<Steps>
+  <Step title="Discord">
+    Typically **under 2 hours** during business hours. Community may respond faster.
+  </Step>
+  
+  <Step title="Email">
+    **Within 24 hours** on business days. Urgent issues are prioritized.
+  </Step>
+  
+  <Step title="GitHub Issues">
+    **Within 48 hours** for initial triage and response.
+  </Step>
+</Steps>
+
+---
+
+## Providing Feedback
+
+Your feedback helps us improve Autumn:
+
+<CardGroup cols={2}>
+  <Card title="Feature Requests" icon="lightbulb">
+    Share ideas on Discord or GitHub Discussions
+  </Card>
+  
+  <Card title="Bug Reports" icon="bug">
+    Report bugs via GitHub Issues or Discord
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Suggest doc improvements via GitHub PRs
+  </Card>
+  
+  <Card title="General Feedback" icon="comment">
+    Email hey@useautumn.com with your thoughts
+  </Card>
+</CardGroup>
+
+---
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="FAQ" icon="question" href="/community/faq">
+    Common questions and answers
+  </Card>
+  <Card title="Contributing" icon="code-branch" href="/community/contributing">
+    Contribute to Autumn development
+  </Card>
+</CardGroup>

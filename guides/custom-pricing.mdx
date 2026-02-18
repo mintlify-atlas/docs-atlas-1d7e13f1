@@ -1,0 +1,743 @@
+---
+title: "Custom Pricing"
+description: "Implement enterprise-grade custom pricing, negotiated rates, and grandfathering"
+---
+
+## Overview
+
+Custom pricing allows you to create tailored plans for individual customers without modifying your codebase. This is essential for enterprise sales, special promotions, and grandfathering users on old pricing.
+
+## When to Use Custom Pricing
+
+- **Enterprise contracts**: Negotiated pricing for large customers
+- **Special promotions**: Limited-time offers or partner deals
+- **Grandfathering**: Keep existing customers on legacy pricing
+- **Custom packages**: Unique feature combinations
+- **Volume discounts**: Per-customer volume-based pricing
+- **Pilot programs**: Beta pricing for early adopters
+
+## Creating Custom Plans
+
+### Basic Custom Plan
+
+Create a one-off plan for a specific customer:
+
+```typescript
+const createCustomPlan = async ({
+  customerId,
+  planName,
+  items
+}: {
+  customerId: string;
+  planName: string;
+  items: Array<any>;
+}) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: items,
+      metadata: {
+        custom_plan_name: planName,
+        created_by: 'sales_team',
+        created_at: new Date().toISOString()
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Create enterprise plan with custom pricing
+await createCustomPlan({
+  customerId: 'cus_acme_corp',
+  planName: 'ACME Corp Enterprise',
+  items: [
+    {
+      feature_id: 'team_seats',
+      included: 100,
+      unlimited: false,
+      price: {
+        amount: 800,  // $8 per seat (normally $20)
+        billing_units: 1,
+        billing_method: 'per_unit',
+        interval: 'month'
+      }
+    },
+    {
+      feature_id: 'api_calls',
+      included: 10000000,  // 10M calls
+      unlimited: false,
+      price: {
+        amount: 5,  // $0.05 per 1k overage (normally $0.50)
+        billing_units: 1000,
+        billing_method: 'per_unit'
+      }
+    },
+    {
+      feature_id: 'priority_support',
+      included: 1,
+      unlimited: true,
+      price: null  // Included at no extra cost
+    }
+  ]
+});
+```
+
+### Custom Plan with Base Price
+
+```typescript
+const customPlanWithBase = {
+  customer_id: 'cus_enterprise',
+  is_custom: true,
+  items: [
+    {
+      // Base subscription fee
+      feature_id: 'platform_access',
+      included: 1,
+      price: {
+        amount: 500000,  // $5,000/month base fee
+        interval: 'month'
+      }
+    },
+    {
+      // Usage-based on top
+      feature_id: 'compute_hours',
+      included: 1000,  // 1,000 hours included
+      price: {
+        amount: 500,  // $5/hour overage
+        billing_units: 1,
+        billing_method: 'per_unit'
+      }
+    }
+  ]
+};
+```
+
+## Negotiated Pricing
+
+### Volume Discounts
+
+Apply different pricing tiers based on volume:
+
+```typescript
+const applyVolumePricing = async ({
+  customerId,
+  committedSeats
+}: {
+  customerId: string;
+  committedSeats: number;
+}) => {
+  // Calculate discount based on commitment
+  let pricePerSeat = 2000;  // $20 base price
+  
+  if (committedSeats >= 100) {
+    pricePerSeat = 800;  // $8 for 100+ seats (60% discount)
+  } else if (committedSeats >= 50) {
+    pricePerSeat = 1200;  // $12 for 50+ seats (40% discount)
+  } else if (committedSeats >= 25) {
+    pricePerSeat = 1500;  // $15 for 25+ seats (25% discount)
+  }
+
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [{
+        feature_id: 'team_seats',
+        included: committedSeats,
+        price: {
+          amount: pricePerSeat,
+          billing_units: 1,
+          billing_method: 'per_unit',
+          interval: 'month'
+        }
+      }],
+      metadata: {
+        pricing_tier: committedSeats >= 100 ? 'enterprise' : 'business',
+        committed_seats: committedSeats,
+        discount_percentage: ((2000 - pricePerSeat) / 2000 * 100).toFixed(0)
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Apply enterprise volume pricing
+await applyVolumePricing({
+  customerId: 'cus_bigco',
+  committedSeats: 150
+});
+// Result: 150 seats × $8 = $1,200/month (vs $3,000 at standard pricing)
+```
+
+### Annual Discounts
+
+Offer discounted annual pricing:
+
+```typescript
+const createAnnualPlan = async (customerId: string, monthlyPrice: number) => {
+  const annualDiscount = 0.20;  // 20% discount for annual
+  const annualPrice = monthlyPrice * 12 * (1 - annualDiscount);
+
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [{
+        feature_id: 'platform_access',
+        included: 1,
+        price: {
+          amount: annualPrice,
+          interval: 'year'
+        }
+      }],
+      metadata: {
+        billing_type: 'annual',
+        monthly_equivalent: monthlyPrice,
+        discount_percentage: (annualDiscount * 100).toFixed(0),
+        savings: (monthlyPrice * 12 - annualPrice)
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Convert $99/month to annual with 20% discount
+await createAnnualPlan('cus_123', 9900);
+// Result: $950.40/year instead of $1,188/year (save $237.60)
+```
+
+## Grandfathering
+
+### Keep Users on Legacy Pricing
+
+When you raise prices, keep existing customers on their current rate:
+
+```typescript
+const grandfatherExistingCustomers = async () => {
+  // Get all customers on the old pricing
+  const existingCustomers = await db.customers.find({
+    plan_id: 'pro_plan_v1',
+    created_before: new Date('2024-01-01')
+  });
+
+  for (const customer of existingCustomers) {
+    // Create custom plan matching their old pricing
+    await fetch('https://api.useautumn.com/attach', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customer.id,
+        is_custom: true,
+        items: [
+          {
+            feature_id: 'platform_access',
+            included: 1,
+            price: {
+              amount: 4900,  // Old price: $49/month
+              interval: 'month'
+            }
+          }
+        ],
+        metadata: {
+          grandfathered: true,
+          original_plan: 'pro_plan_v1',
+          original_price: 4900,
+          new_plan_price: 9900,  // New price: $99/month
+          locked_until: null  // Forever
+        }
+      })
+    });
+
+    // Store grandfathering status
+    await db.customers.update(customer.id, {
+      grandfathered: true,
+      grandfathered_at: new Date(),
+      original_plan: 'pro_plan_v1'
+    });
+  }
+};
+```
+
+### Time-Limited Grandfathering
+
+Grandfather for a specific period:
+
+```typescript
+const grandfatherWithExpiry = async (customerId: string, monthsLocked: number) => {
+  const expiryDate = new Date();
+  expiryDate.setMonth(expiryDate.getMonth() + monthsLocked);
+
+  await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [{
+        feature_id: 'platform_access',
+        included: 1,
+        price: {
+          amount: 4900,  // Legacy price
+          interval: 'month'
+        }
+      }],
+      metadata: {
+        grandfathered: true,
+        grandfathered_until: expiryDate.toISOString(),
+        will_migrate_to: 'pro_plan_v2'
+      }
+    })
+  });
+
+  // Schedule migration
+  await scheduleJob(expiryDate, async () => {
+    await migrateToNewPricing(customerId, 'pro_plan_v2');
+  });
+};
+
+// Lock pricing for 12 months
+await grandfatherWithExpiry('cus_123', 12);
+```
+
+## Plan Overrides
+
+### Feature-Level Overrides
+
+Override specific features while keeping the base plan:
+
+```typescript
+const overrideFeature = async ({
+  customerId,
+  basePlanId,
+  overrides
+}: {
+  customerId: string;
+  basePlanId: string;
+  overrides: Array<{
+    feature_id: string;
+    included?: number;
+    price?: any;
+  }>;
+}) => {
+  // Get base plan
+  const basePlan = await fetch(
+    `https://api.useautumn.com/products/${basePlanId}`,
+    {
+      headers: { 'Authorization': 'Bearer YOUR_API_KEY' }
+    }
+  ).then(r => r.json());
+
+  // Apply overrides to base plan items
+  const customItems = basePlan.items.map((item: any) => {
+    const override = overrides.find(o => o.feature_id === item.feature_id);
+    if (override) {
+      return { ...item, ...override };
+    }
+    return item;
+  });
+
+  // Create custom plan
+  return await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: customItems,
+      metadata: {
+        base_plan: basePlanId,
+        overridden_features: overrides.map(o => o.feature_id)
+      }
+    })
+  }).then(r => r.json());
+};
+
+// Give customer higher limits
+await overrideFeature({
+  customerId: 'cus_vip',
+  basePlanId: 'pro_plan',
+  overrides: [
+    {
+      feature_id: 'api_calls',
+      included: 1000000  // 1M instead of standard 100k
+    },
+    {
+      feature_id: 'storage_gb',
+      included: 500,  // 500GB instead of 100GB
+      price: null  // No overage charges
+    }
+  ]
+});
+```
+
+### Promotional Pricing
+
+Apply temporary promotional rates:
+
+```typescript
+const applyPromotion = async ({
+  customerId,
+  promotionCode,
+  durationMonths
+}: {
+  customerId: string;
+  promotionCode: string;
+  durationMonths: number;
+}) => {
+  const promos = {
+    'LAUNCH50': 0.50,  // 50% off
+    'SUMMER25': 0.25,  // 25% off
+    'FRIEND': 0.30     // 30% off
+  };
+
+  const discount = promos[promotionCode as keyof typeof promos];
+  if (!discount) throw new Error('Invalid promotion code');
+
+  const standardPrice = 9900;  // $99/month
+  const promoPrice = standardPrice * (1 - discount);
+  const expiryDate = new Date();
+  expiryDate.setMonth(expiryDate.getMonth() + durationMonths);
+
+  await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [{
+        feature_id: 'platform_access',
+        included: 1,
+        price: {
+          amount: promoPrice,
+          interval: 'month'
+        }
+      }],
+      metadata: {
+        promotion_code: promotionCode,
+        discount_percentage: (discount * 100).toFixed(0),
+        promo_expires: expiryDate.toISOString(),
+        standard_price: standardPrice
+      }
+    })
+  });
+
+  // Schedule price increase when promo ends
+  await scheduleJob(expiryDate, async () => {
+    await migrateToStandardPricing(customerId);
+  });
+};
+
+// Apply 50% off for 3 months
+await applyPromotion({
+  customerId: 'cus_new',
+  promotionCode: 'LAUNCH50',
+  durationMonths: 3
+});
+```
+
+## Enterprise Contracts
+
+### Multi-Year Contracts
+
+Lock in pricing for multi-year agreements:
+
+```typescript
+const createEnterpriseContract = async ({
+  customerId,
+  contractTermYears,
+  annualValue,
+  features
+}: {
+  customerId: string;
+  contractTermYears: number;
+  annualValue: number;
+  features: Array<any>;
+}) => {
+  const monthlyValue = annualValue / 12;
+
+  await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [
+        {
+          feature_id: 'enterprise_access',
+          included: 1,
+          price: {
+            amount: monthlyValue,
+            interval: 'month'
+          }
+        },
+        ...features
+      ],
+      metadata: {
+        contract_type: 'enterprise',
+        contract_term_years: contractTermYears,
+        annual_contract_value: annualValue,
+        contract_start: new Date().toISOString(),
+        contract_end: new Date(
+          Date.now() + contractTermYears * 365 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        renewal_notice_days: 90
+      }
+    })
+  });
+
+  // Store contract details
+  await db.contracts.create({
+    customer_id: customerId,
+    term_years: contractTermYears,
+    annual_value: annualValue,
+    locked_pricing: true,
+    auto_renew: false
+  });
+};
+
+// Create 3-year enterprise contract
+await createEnterpriseContract({
+  customerId: 'cus_bigcorp',
+  contractTermYears: 3,
+  annualValue: 12000000,  // $120k/year
+  features: [
+    {
+      feature_id: 'team_seats',
+      included: 500,
+      unlimited: false,
+      price: { amount: 500, billing_units: 1, billing_method: 'per_unit' }
+    },
+    {
+      feature_id: 'api_calls',
+      unlimited: true,
+      price: null
+    },
+    {
+      feature_id: 'dedicated_support',
+      included: 1,
+      unlimited: true,
+      price: null
+    }
+  ]
+});
+```
+
+### Usage Commitments
+
+Commit to minimum usage with discounted rates:
+
+```typescript
+const createCommitmentContract = async ({
+  customerId,
+  committedUsage,
+  discountRate
+}: {
+  customerId: string;
+  committedUsage: number;
+  discountRate: number;
+}) => {
+  const standardRate = 50;  // $0.50 per unit
+  const discountedRate = standardRate * (1 - discountRate);
+  const minimumCharge = committedUsage * discountedRate;
+
+  await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [
+        {
+          feature_id: 'minimum_commitment',
+          included: 1,
+          price: {
+            amount: minimumCharge,  // Minimum monthly charge
+            interval: 'month'
+          }
+        },
+        {
+          feature_id: 'api_calls',
+          included: committedUsage,  // Committed usage included
+          price: {
+            amount: discountedRate,  // Discounted overage rate
+            billing_units: 1000,
+            billing_method: 'per_unit'
+          }
+        }
+      ],
+      metadata: {
+        commitment_type: 'usage',
+        committed_usage: committedUsage,
+        standard_rate: standardRate,
+        discounted_rate: discountedRate,
+        discount_percentage: (discountRate * 100).toFixed(0)
+      }
+    })
+  });
+};
+
+// Commit to 1M API calls/month for 30% discount
+await createCommitmentContract({
+  customerId: 'cus_highvolume',
+  committedUsage: 1000000,
+  discountRate: 0.30
+});
+// Result: $350/month minimum (1M calls × $0.35)
+// Overage: $0.35 per 1k calls (vs $0.50 standard)
+```
+
+## Managing Custom Pricing
+
+### Track Custom Plans
+
+```typescript
+const getCustomPricingCustomers = async () => {
+  // Query for customers with custom plans
+  const response = await fetch(
+    'https://api.useautumn.com/customers?has_custom_pricing=true',
+    {
+      headers: { 'Authorization': 'Bearer YOUR_API_KEY' }
+    }
+  );
+
+  const customers = await response.json();
+  
+  return customers.map((c: any) => ({
+    customer_id: c.customer_id,
+    plan_type: c.metadata?.custom_plan_name,
+    monthly_value: c.subscription?.amount,
+    grandfathered: c.metadata?.grandfathered,
+    contract_end: c.metadata?.contract_end
+  }));
+};
+```
+
+### Migrate Custom Plans
+
+```typescript
+const migrateCustomPlan = async ({
+  customerId,
+  newPlanId,
+  preserveDiscount
+}: {
+  customerId: string;
+  newPlanId: string;
+  preserveDiscount?: number;
+}) => {
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: newPlanId,
+      customize: preserveDiscount ? {
+        discount_percentage: preserveDiscount
+      } : undefined,
+      metadata: {
+        migrated_from_custom: true,
+        migration_date: new Date().toISOString()
+      }
+    })
+  });
+
+  return await response.json();
+};
+```
+
+## Best Practices
+
+<Tip>
+  **Document everything**: Store all custom pricing details in metadata for audit and customer support.
+</Tip>
+
+<Warning>
+  **Set expiration dates**: Always include end dates for promotional pricing to avoid confusion.
+</Warning>
+
+<Note>
+  **Review regularly**: Audit custom plans quarterly to ensure they still make business sense.
+</Note>
+
+### Pricing Strategy
+
+1. **Clear value propositions**: Justify custom pricing with clear value adds
+2. **Consistency**: Similar customers should get similar deals
+3. **Documentation**: Track all custom pricing agreements
+4. **Sunset plans**: Have a strategy for moving customers off legacy pricing
+5. **Renewal opportunities**: Use contract renewals to standardize pricing
+
+### Sales Process
+
+1. **Approval workflow**: Require manager approval for large discounts
+2. **Standardize tiers**: Define standard enterprise tiers (e.g., 25%, 40%, 60% off)
+3. **Minimum values**: Set minimum contract values for custom pricing
+4. **Term requirements**: Require annual/multi-year commits for best pricing
+5. **Usage audits**: Review actual usage against commitments
+
+### Technical Implementation
+
+1. **Use metadata extensively**: Store all context in Autumn metadata
+2. **Audit logging**: Track who created custom plans and why
+3. **Automated alerts**: Notify when contracts are expiring
+4. **Self-service limits**: Prevent sales from offering unsustainable deals
+5. **Migration tools**: Build tools to bulk-migrate legacy customers
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Subscriptions" icon="rotate" href="/guides/managing-subscriptions">
+    Handle plan changes
+  </Card>
+  
+  <Card title="Checkout Flows" icon="credit-card" href="/guides/checkout-flows">
+    Implement payment flows
+  </Card>
+  
+  <Card title="Products API" icon="code" href="/api/products/create">
+    Create custom products
+  </Card>
+  
+  <Card title="Attach API" icon="link" href="/api/core/attach">
+    Attach custom plans
+  </Card>
+</CardGroup>

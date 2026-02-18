@@ -1,0 +1,272 @@
+---
+title: "Products & Plans"
+description: "Understanding products and plans in Autumn and how they relate to Stripe"
+---
+
+## Overview
+
+In Autumn, **products** (also called **plans**) define the pricing and features that customers can subscribe to. They serve as templates that configure what customers get access to, how much they pay, and how billing works.
+
+<Note>
+  The terms "product" and "plan" are used interchangeably in Autumn. In the API, you'll see references to both depending on the endpoint version.
+</Note>
+
+## Product Structure
+
+A product in Autumn consists of several key components:
+
+### Basic Information
+
+```typescript
+{
+  id: string;              // Unique identifier
+  name: string;            // Display name
+  description: string;     // Optional description
+  group: string;           // Optional grouping for organization
+  archived: boolean;       // Whether product is archived
+}
+```
+
+### Add-ons vs Base Products
+
+Products can be configured as either base products or add-ons:
+
+- **Base Products** (`is_add_on: false`, `is_default: false`): Standard subscription plans
+- **Add-ons** (`is_add_on: true`): Supplementary products that attach to existing subscriptions
+- **Default Products** (`is_default: true`): Automatically assigned to customers
+
+### Base Price
+
+The recurring charge for the product:
+
+```typescript
+{
+  price: {
+    amount: number;           // Amount in cents
+    interval: "day" | "week" | "month" | "year";
+    interval_count: number;   // Billing frequency multiplier
+    display: {                // Optional display configuration
+      // ...
+    }
+  }
+}
+```
+
+**Example**: A monthly plan at $99:
+
+```json
+{
+  "price": {
+    "amount": 9900,
+    "interval": "month",
+    "interval_count": 1
+  }
+}
+```
+
+### Plan Items (Features)
+
+Each product contains an array of **plan items** that define feature access and usage-based pricing. See [Features & Entitlements](/concepts/features-and-entitlements) for details.
+
+```typescript
+{
+  items: [
+    {
+      feature_id: string;
+      included: number;       // Included allowance
+      unlimited: boolean;     // Unlimited access
+      reset: {                // Usage reset configuration
+        interval: "day" | "week" | "month" | "year";
+        interval_count: number;
+      };
+      price: {                // Optional overage pricing
+        // ...
+      }
+    }
+  ]
+}
+```
+
+## Stripe Integration
+
+### How Products Map to Stripe
+
+Autumn products sync with Stripe in the following way:
+
+1. **Product Creation**: When you create an Autumn product, Autumn creates corresponding Stripe products and prices
+2. **Price Components**: 
+   - Base price → Stripe recurring price
+   - Usage-based features → Stripe metered prices or usage records
+3. **Metadata**: Autumn stores configuration in Stripe metadata for webhook processing
+
+### Processor Configuration
+
+Products track their Stripe representation:
+
+```typescript
+// From productTable.ts
+processor: {
+  type: "stripe";
+  id: string;  // Stripe product ID (e.g., "prod_xxx")
+}
+```
+
+### Product Versions
+
+Autumn supports product versioning to handle API evolution:
+
+```typescript
+version: number;  // Default: 1
+base_variant_id: string;  // Links variants together
+```
+
+This allows you to create new versions of products while maintaining backward compatibility.
+
+## Creating Products
+
+Products are typically created through the Autumn API or dashboard. Here's the basic flow:
+
+<Steps>
+  <Step title="Define product structure">
+    Specify name, description, base price, and features
+  </Step>
+  <Step title="Configure plan items">
+    Add features with usage limits and pricing
+  </Step>
+  <Step title="Set up free trial (optional)">
+    Configure trial duration and included features
+  </Step>
+  <Step title="Create in Autumn">
+    Autumn automatically provisions in Stripe
+  </Step>
+</Steps>
+
+## Product Configuration Options
+
+### Free Trials
+
+Products can include free trial configurations:
+
+```typescript
+free_trial: {
+  duration_days: number;
+  // Additional trial configuration
+}
+```
+
+See [Pricing Models](/concepts/pricing-models) for trial billing behavior.
+
+### Auto-enable
+
+Control whether products automatically activate:
+
+```typescript
+auto_enable: boolean;  // Whether to activate immediately on attach
+```
+
+### Product Groups
+
+Organize related products using groups:
+
+```typescript
+group: string;  // e.g., "premium", "enterprise", "add-ons"
+```
+
+## Product Lifecycle
+
+### Active Products
+
+Active products can be attached to customers via:
+- Checkout sessions
+- Direct API calls (`/attach` endpoint)
+- Subscription updates
+
+### Scheduled Products
+
+Products can be scheduled to activate at a future date:
+
+```typescript
+// In attach parameters
+{
+  scheduled: true;
+  starts_at: number;  // Unix timestamp
+}
+```
+
+### Archiving Products
+
+Archive products instead of deleting them:
+
+```typescript
+archived: boolean;  // Hides from active lists, preserves history
+```
+
+<Warning>
+  Archived products remain accessible to customers who already have them, but cannot be attached to new customers.
+</Warning>
+
+## Multi-environment Support
+
+Products are scoped to environments:
+
+```typescript
+env: "test" | "live";  // Matches Stripe test/live mode
+```
+
+This allows you to:
+- Test products in sandbox environment
+- Maintain separate production catalog
+- Safely experiment with pricing changes
+
+## Product Eligibility
+
+When retrieving products, Autumn can include eligibility information:
+
+```typescript
+customer_eligibility: {
+  trial_available: boolean;  // Can customer use free trial
+  scenario: "new" | "upgrade" | "downgrade" | "renew" | ...;
+}
+```
+
+This helps you build product selection UIs that show only valid options.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive IDs">
+    Choose meaningful product IDs like `pro-monthly` or `enterprise-annual` rather than generic identifiers.
+  </Accordion>
+  
+  <Accordion title="Group related products">
+    Use the `group` field to organize products by tier, category, or feature set.
+  </Accordion>
+  
+  <Accordion title="Version carefully">
+    When changing pricing, consider creating a new version rather than modifying existing products to avoid affecting current subscribers.
+  </Accordion>
+  
+  <Accordion title="Archive instead of delete">
+    Always archive products rather than deleting them to maintain historical data and reporting.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Features & Entitlements" icon="key" href="/concepts/features-and-entitlements">
+    Learn how features define what customers can access
+  </Card>
+  
+  <Card title="Pricing Models" icon="dollar-sign" href="/concepts/pricing-models">
+    Explore different pricing strategies
+  </Card>
+  
+  <Card title="Create a Product" icon="plus" href="/api/products/create">
+    API reference for product creation
+  </Card>
+  
+  <Card title="Attach Products" icon="link" href="/api/core/attach">
+    Subscribe customers to products
+  </Card>
+</CardGroup>

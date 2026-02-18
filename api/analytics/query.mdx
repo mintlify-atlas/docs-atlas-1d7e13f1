@@ -1,0 +1,165 @@
+---
+title: 'Query Analytics'
+api: 'POST /query'
+description: 'Query usage analytics for a customer features over a specified time range'
+---
+
+Query usage analytics to retrieve historical usage data for dashboards, reports, or usage displays. This endpoint allows you to fetch usage metrics for specific features over configurable time ranges.
+
+## Use Cases
+
+- Display usage data in customer dashboards
+- Generate usage reports for billing periods
+- Track feature adoption over time
+- Monitor usage trends across different time ranges
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  The ID of the customer to query analytics for
+
+  ```json
+  "cus_123"
+  ```
+</ParamField>
+
+<ParamField body="feature_id" type="string | string[]" required>
+  The feature ID(s) to query. Can be a single feature ID or an array of feature IDs
+
+  **Single feature:**
+  ```json
+  "api_calls"
+  ```
+
+  **Multiple features:**
+  ```json
+  ["api_calls", "storage_gb", "team_members"]
+  ```
+</ParamField>
+
+<ParamField body="range" type="string" default="last_cycle">
+  Time range for the query. If not provided, defaults to `last_cycle`
+
+  **Available ranges:**
+  - `24h` - Last 24 hours
+  - `7d` - Last 7 days
+  - `30d` - Last 30 days
+  - `90d` - Last 90 days
+  - `last_cycle` - Current billing cycle
+  - `1bc` - One billing cycle
+  - `3bc` - Three billing cycles
+
+  ```json
+  "7d"
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="list" type="array">
+  List of usage data points for the specified time range
+
+  <ResponseField name="period" type="number">
+    Unix timestamp (in milliseconds) for the data point period
+  </ResponseField>
+
+  <ResponseField name="count" type="number">
+    Usage count for the period
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.useautumn.com/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cus_123",
+    "feature_id": "api_calls",
+    "range": "7d"
+  }'
+```
+
+```javascript JavaScript
+const autumn = new Autumn({ apiKey: 'your_api_key' });
+
+const result = await autumn.query({
+  customer_id: 'cus_123',
+  feature_id: 'api_calls',
+  range: '7d'
+});
+```
+
+```python Python
+from autumn import Autumn
+
+autumn = Autumn(api_key='your_api_key')
+
+result = autumn.query(
+    customer_id='cus_123',
+    feature_id='api_calls',
+    range='7d'
+)
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/autumn-js';
+
+const autumn = new Autumn({ apiKey: 'your_api_key' });
+
+const result = await autumn.query({
+  customer_id: 'cus_123',
+  feature_id: 'api_calls',
+  range: '7d'
+});
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "list": [
+    { "period": 1717000000000, "count": 150 },
+    { "period": 1717086400000, "count": 230 },
+    { "period": 1717172800000, "count": 189 },
+    { "period": 1717259200000, "count": 205 },
+    { "period": 1717345600000, "count": 178 },
+    { "period": 1717432000000, "count": 220 },
+    { "period": 1717518400000, "count": 195 }
+  ]
+}
+```
+</ResponseExample>
+
+## Query Multiple Features
+
+You can query analytics for multiple features simultaneously by passing an array of feature IDs:
+
+```json
+{
+  "customer_id": "cus_123",
+  "feature_id": ["api_calls", "storage_gb", "team_members"],
+  "range": "30d"
+}
+```
+
+The response will include separate data points for each feature in the list.
+
+## Understanding Time Ranges
+
+### Fixed Time Ranges
+- **24h**: Returns hourly data points for the last 24 hours
+- **7d**, **30d**, **90d**: Returns daily data points for the specified number of days
+
+### Billing Cycle Ranges
+- **last_cycle**: Returns data for the current billing period
+- **1bc**: Returns data for one complete billing cycle
+- **3bc**: Returns data for three complete billing cycles
+
+Billing cycle ranges are calculated based on the customer's subscription start date and billing frequency.
+
+## Related Endpoints
+
+- [Track Usage](/api/core/track) - Track usage events for features
+- [Check Access](/api/core/check) - Check feature access and remaining usage
+- [Insights Query](/api/analytics/insights) - Run custom SQL queries on analytics data

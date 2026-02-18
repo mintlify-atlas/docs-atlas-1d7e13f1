@@ -1,0 +1,562 @@
+---
+title: 'Track Usage Event'
+openapi: 'POST /track'
+---
+
+# Track Usage Event
+
+Track usage events for metered features or record analytics events. This endpoint increments usage counters for pay-as-you-go features or tracks customer activity.
+
+## When to Use
+
+Use this to increment usage counters for pay-as-you-go features or track customer activity events.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header:
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  ID which you provided when creating the customer
+  
+  **Example:** `cus_123`
+</ParamField>
+
+<ParamField body="feature_id" type="string">
+  ID of the feature to track usage for. Required if `event_name` is not provided. Use this for direct feature tracking.
+  
+  **Example:** `api_calls`
+  
+  **Note:** Either `feature_id` or `event_name` must be provided, but not both
+</ParamField>
+
+<ParamField body="event_name" type="string">
+  An event name can be used in place of `feature_id`. This can be used if multiple features are tracked in the same event.
+  
+  **Example:** `document_generated`
+  
+  **Note:** Either `feature_id` or `event_name` must be provided, but not both
+</ParamField>
+
+<ParamField body="value" type="number">
+  The amount of usage to record. Defaults to 1. Can be negative to increase the balance (e.g., when removing a seat).
+  
+  **Example:** `5`
+  
+  **Default:** `1`
+</ParamField>
+
+<ParamField body="customer_data" type="object">
+  Additional customer properties. These will be used to create or update the customer if they don't exist or their properties are not already set.
+  
+  <ParamField body="customer_data.name" type="string">
+    Customer's name
+  </ParamField>
+  
+  <ParamField body="customer_data.email" type="string">
+    Customer's email address
+  </ParamField>
+  
+  <ParamField body="customer_data.fingerprint" type="string">
+    Unique identifier to detect duplicate customers
+  </ParamField>
+  
+  <ParamField body="customer_data.metadata" type="object">
+    Additional metadata for the customer
+  </ParamField>
+</ParamField>
+
+<ParamField body="properties" type="object">
+  Additional properties to attach to this usage event.
+  
+  **Example:** `{ "document_type": "pdf", "page_count": 10 }`
+</ParamField>
+
+<ParamField body="idempotency_key" type="string">
+  Unique key to prevent duplicate event recording. Use this to safely retry requests without creating duplicate usage records.
+  
+  **Example:** `evt_abc123xyz`
+</ParamField>
+
+<ParamField body="entity_id" type="string">
+  If using entity balances (eg, seats), the entity ID to track usage for.
+  
+  **Example:** `entity_456`
+</ParamField>
+
+<ParamField body="overage_behavior" type="string">
+  How to handle usage when balance is insufficient.
+  
+  **Options:**
+  - `cap` - Limits usage to available balance
+  - `reject` - Prevents the usage entirely
+  
+  **Example:** `cap`
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="expand" type="string">
+  Comma-separated list of fields to expand in the response.
+  
+  **Options:**
+  - `balance.feature` - Include full feature details in the balance object
+  
+  **Example:** `balance.feature`
+</ParamField>
+
+## Response
+
+<ResponseField name="customer_id" type="string" required>
+  The ID of the customer
+</ResponseField>
+
+<ResponseField name="entity_id" type="string">
+  The ID of the entity (if provided)
+</ResponseField>
+
+<ResponseField name="event_name" type="string">
+  The name of the event that was tracked
+</ResponseField>
+
+<ResponseField name="value" type="number" required>
+  The amount of usage that was recorded
+</ResponseField>
+
+<ResponseField name="balance" type="object">
+  Updated balance information after tracking the event
+  
+  <ResponseField name="balance.feature_id" type="string">
+    The feature ID
+  </ResponseField>
+  
+  <ResponseField name="balance.unlimited" type="boolean">
+    Whether the customer has unlimited access to this feature
+  </ResponseField>
+  
+  <ResponseField name="balance.granted_balance" type="number">
+    The balance granted by the customer's plan
+  </ResponseField>
+  
+  <ResponseField name="balance.purchased_balance" type="number">
+    Additional balance purchased beyond the plan
+  </ResponseField>
+  
+  <ResponseField name="balance.current_balance" type="number">
+    Current remaining balance after this event
+  </ResponseField>
+  
+  <ResponseField name="balance.usage" type="number">
+    Total usage consumed in the current period (including this event)
+  </ResponseField>
+  
+  <ResponseField name="balance.overage_allowed" type="boolean">
+    Whether overage usage is allowed
+  </ResponseField>
+  
+  <ResponseField name="balance.max_purchase" type="number">
+    Maximum additional balance that can be purchased (null if unlimited)
+  </ResponseField>
+  
+  <ResponseField name="balance.reset" type="object">
+    Reset schedule information
+    
+    <ResponseField name="balance.reset.interval" type="string">
+      Reset interval (e.g., "month", "day", "year")
+    </ResponseField>
+    
+    <ResponseField name="balance.reset.interval_count" type="number">
+      Number of intervals between resets
+    </ResponseField>
+    
+    <ResponseField name="balance.reset.resets_at" type="number">
+      Unix timestamp when the balance will next reset
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="balance.plan_id" type="string">
+    The ID of the plan providing this balance
+  </ResponseField>
+  
+  <ResponseField name="balance.feature" type="object">
+    Expanded feature object (if requested with expand parameter)
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="balances" type="object">
+  Map of feature IDs to balance objects (when using event_name that maps to multiple features)
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.useautumn.com/track \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cus_123",
+    "feature_id": "api_calls",
+    "value": 1
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    value: 1
+  })
+});
+
+const data = await response.json();
+console.log(`Remaining balance: ${data.balance.current_balance}`);
+```
+
+```typescript TypeScript
+interface TrackRequest {
+  customer_id: string;
+  feature_id?: string;
+  event_name?: string;
+  value?: number;
+  properties?: Record<string, any>;
+  idempotency_key?: string;
+  entity_id?: string;
+  overage_behavior?: 'cap' | 'reject';
+  customer_data?: {
+    name?: string;
+    email?: string;
+    metadata?: Record<string, any>;
+  };
+}
+
+interface TrackResponse {
+  customer_id: string;
+  entity_id?: string;
+  event_name?: string;
+  value: number;
+  balance: {
+    feature_id: string;
+    unlimited: boolean;
+    granted_balance: number;
+    purchased_balance: number;
+    current_balance: number;
+    usage: number;
+    overage_allowed: boolean;
+    max_purchase: number | null;
+    reset: {
+      interval: string;
+      interval_count?: number;
+      resets_at: number | null;
+    } | null;
+    plan_id: string | null;
+  } | null;
+  balances?: Record<string, any>;
+}
+
+const response = await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    value: 1,
+    properties: {
+      endpoint: '/api/users',
+      method: 'GET'
+    }
+  } as TrackRequest)
+});
+
+const data: TrackResponse = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.useautumn.com/track',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={
+        'customer_id': 'cus_123',
+        'feature_id': 'api_calls',
+        'value': 1
+    }
+)
+
+data = response.json()
+print(f"Usage recorded. Remaining: {data['balance']['current_balance']}")
+```
+
+</CodeGroup>
+
+## Example Response
+
+### Successful Usage Tracking
+
+```json
+{
+  "customer_id": "cus_123",
+  "value": 1,
+  "balance": {
+    "feature_id": "api_calls",
+    "unlimited": false,
+    "granted_balance": 1000,
+    "purchased_balance": 0,
+    "current_balance": 749,
+    "usage": 251,
+    "overage_allowed": false,
+    "max_purchase": null,
+    "reset": {
+      "interval": "month",
+      "interval_count": 1,
+      "resets_at": 1704067200000
+    },
+    "plan_id": "pro_plan"
+  }
+}
+```
+
+### Tracking with Event Name
+
+```json
+{
+  "customer_id": "cus_123",
+  "event_name": "document_generated",
+  "value": 5,
+  "balances": {
+    "document_generation": {
+      "feature_id": "document_generation",
+      "unlimited": false,
+      "current_balance": 45,
+      "usage": 5,
+      "reset": {
+        "interval": "month",
+        "resets_at": 1704067200000
+      }
+    },
+    "storage": {
+      "feature_id": "storage",
+      "unlimited": false,
+      "current_balance": 995,
+      "usage": 5,
+      "reset": null
+    }
+  }
+}
+```
+
+### Tracking with Overage Capping
+
+```json
+{
+  "customer_id": "cus_123",
+  "value": 5,
+  "balance": {
+    "feature_id": "api_calls",
+    "unlimited": false,
+    "granted_balance": 1000,
+    "purchased_balance": 0,
+    "current_balance": 0,
+    "usage": 1000,
+    "overage_allowed": false,
+    "max_purchase": null,
+    "reset": {
+      "interval": "month",
+      "interval_count": 1,
+      "resets_at": 1704067200000
+    },
+    "plan_id": "pro_plan"
+  }
+}
+```
+
+## Error Responses
+
+### 400 Bad Request - Missing Required Field
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Either feature_id or event_name must be provided"
+  }
+}
+```
+
+### 400 Bad Request - Both Fields Provided
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Cannot provide both feature_id and event_name"
+  }
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+### 403 Forbidden - Insufficient Balance
+
+```json
+{
+  "error": {
+    "code": "insufficient_balance",
+    "message": "Customer has insufficient balance for this feature",
+    "balance": {
+      "current_balance": 0,
+      "required": 5
+    }
+  }
+}
+```
+
+## Use Cases
+
+### Tracking API Calls
+
+```typescript
+// Track each API call
+app.use(async (req, res, next) => {
+  const customerId = req.user.id;
+  
+  try {
+    const trackResponse = await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'api_calls',
+        value: 1,
+        properties: {
+          endpoint: req.path,
+          method: req.method
+        }
+      })
+    });
+    
+    const data = await trackResponse.json();
+    
+    // Add usage info to response headers
+    res.set('X-RateLimit-Remaining', data.balance?.current_balance);
+    res.set('X-RateLimit-Reset', data.balance?.reset?.resets_at);
+    
+    next();
+  } catch (error) {
+    if (error.code === 'insufficient_balance') {
+      res.status(429).json({ error: 'Rate limit exceeded' });
+    } else {
+      throw error;
+    }
+  }
+});
+```
+
+### Idempotent Event Tracking
+
+```javascript
+// Safe retry with idempotency key
+const trackUsage = async (customerId, featureId, value, requestId) => {
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: featureId,
+      value: value,
+      idempotency_key: requestId  // Prevents duplicate tracking on retry
+    })
+  });
+  
+  return response.json();
+};
+```
+
+### Tracking Multiple Features with Event Names
+
+```javascript
+// Track a complex event that affects multiple features
+const response = await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    event_name: 'video_transcoded',  // Maps to multiple features
+    value: 1,
+    properties: {
+      video_id: 'vid_456',
+      duration_seconds: 120,
+      resolution: '1080p'
+    }
+  })
+});
+
+const data = await response.json();
+// data.balances will contain updated balances for all affected features
+```
+
+### Handling Negative Values (Credits)
+
+```javascript
+// Add balance back when a user removes a seat
+const response = await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'team_seats',
+    value: -1,  // Negative value increases balance
+    entity_id: 'user_789'
+  })
+});
+```
+
+## Notes
+
+- Usage is tracked atomically - the request will fail if there's insufficient balance (unless overage is allowed)
+- Use `idempotency_key` to safely retry requests without double-counting usage
+- The `value` parameter can be negative to add balance back (e.g., refunds, seat removal)
+- When using `event_name`, the event can map to multiple features, and all their balances will be updated
+- The `properties` field is useful for analytics and can be queried later
+- If `overage_behavior` is set to `cap`, the actual recorded usage may be less than the requested `value`
+- The response includes the updated balance information so you can display remaining usage to users

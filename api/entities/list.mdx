@@ -1,0 +1,105 @@
+---
+title: 'List Entities'
+openapi: 'GET /customers/{customer_id}/entities'
+---
+
+Retrieve all entities for a specific customer.
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The ID of the customer to list entities for
+</ParamField>
+
+## Query Parameters
+
+Supports the same query parameters as Get Entity for expanding fields.
+
+<ParamField query="expand" type="array">
+  Comma-separated list of fields to expand:
+  
+  - `invoices`
+  - `subscriptions.plan`
+  - `purchases.plan`
+  - `balances.feature`
+</ParamField>
+
+<ParamField query="skip_cache" type="boolean">
+  Skip cache and fetch fresh data
+</ParamField>
+
+<ParamField query="with_autumn_id" type="boolean">
+  Include Autumn internal ID in response
+</ParamField>
+
+## Response
+
+Returns an array of entity objects. Each entity has the same structure as the Get Entity response.
+
+<ResponseField name="entities" type="array">
+  Array of entity objects
+  
+  <Expandable title="Entity Object">
+    <ResponseField name="id" type="string">
+      The entity ID
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The entity name
+    </ResponseField>
+    
+    <ResponseField name="customer_id" type="string">
+      Parent customer ID
+    </ResponseField>
+    
+    <ResponseField name="feature_id" type="string">
+      Associated feature ID
+    </ResponseField>
+    
+    <ResponseField name="customer_data" type="object">
+      Custom data
+    </ResponseField>
+    
+    <ResponseField name="subscriptions" type="array">
+      Associated subscriptions
+    </ResponseField>
+    
+    <ResponseField name="scheduled_subscriptions" type="array">
+      Scheduled subscriptions
+    </ResponseField>
+    
+    <ResponseField name="balances" type="object">
+      Feature balances
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```bash Request
+curl -X GET "https://api.useautumn.com/v1/customers/cus_123/entities" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json Response
+[
+  {
+    "id": "workspace_1",
+    "name": "Production Workspace",
+    "customer_id": "cus_123",
+    "feature_id": "workspaces",
+    "subscriptions": [],
+    "scheduled_subscriptions": [],
+    "balances": {}
+  },
+  {
+    "id": "workspace_2",
+    "name": "Development Workspace",
+    "customer_id": "cus_123",
+    "feature_id": "workspaces",
+    "subscriptions": [],
+    "scheduled_subscriptions": [],
+    "balances": {}
+  }
+]
+```

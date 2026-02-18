@@ -1,0 +1,281 @@
+---
+title: 'List Customers'
+api: 'POST /customers/list'
+---
+
+Retrieves a paginated list of customers. This endpoint supports filtering by subscription status, plan, and search queries. Note that this endpoint uses POST method to accept a request body with filter parameters.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header as a Bearer token.
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Request Body
+
+<ParamField body="offset" type="number" default={0}>
+  Number of customers to skip before returning results. Used for pagination.
+</ParamField>
+
+<ParamField body="limit" type="number" default={10}>
+  Number of customers to return per page. Minimum 1, maximum 1000. Defaults to 10.
+</ParamField>
+
+<ParamField body="plans" type="array" optional>
+  Filter customers by their active subscriptions. Each item in the array should be an object with:
+  - `id` (string, required) - The plan ID to filter by
+  - `versions` (number[], optional) - Specific plan versions to include
+  
+  Returns only customers with active subscriptions to the specified plans.
+</ParamField>
+
+<ParamField body="subscription_status" type="string" optional>
+  Filter by subscription status. Available values:
+  - `active` - Only customers with active subscriptions
+  - `scheduled` - Only customers with scheduled subscriptions
+  
+  If not specified, returns customers with both active and scheduled subscriptions.
+</ParamField>
+
+<ParamField body="search" type="string" optional>
+  Search customers by ID, name, or email. Performs a case-insensitive partial match.
+</ParamField>
+
+## Response
+
+Returns a paginated list of customer objects.
+
+<ResponseField name="list" type="array">
+  Array of customer objects. Each customer includes their basic information, subscriptions, and balances.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  Whether more results exist after this page. Use this to determine if you should fetch the next page.
+</ResponseField>
+
+<ResponseField name="offset" type="number">
+  The offset value from the request
+</ResponseField>
+
+<ResponseField name="limit" type="number">
+  The limit value from the request
+</ResponseField>
+
+<ResponseField name="total" type="number">
+  Total number of customers returned in the current page (length of the list array)
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST "https://api.autumnai.com/customers/list" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "offset": 0,
+    "limit": 20
+  }'
+```
+
+```bash cURL (with filters)
+curl -X POST "https://api.autumnai.com/customers/list" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "offset": 0,
+    "limit": 20,
+    "plans": [
+      {
+        "id": "pro_plan",
+        "versions": [1, 2]
+      }
+    ],
+    "subscription_status": "active",
+    "search": "acme"
+  }'
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/sdk';
+
+const autumn = new Autumn({
+  apiKey: process.env.AUTUMN_API_KEY
+});
+
+// Basic list
+const customers = await autumn.customers.list({
+  offset: 0,
+  limit: 20
+});
+
+// With filters
+const proCustomers = await autumn.customers.list({
+  offset: 0,
+  limit: 20,
+  plans: [
+    {
+      id: 'pro_plan',
+      versions: [1, 2]
+    }
+  ],
+  subscription_status: 'active',
+  search: 'acme'
+});
+
+// Pagination example
+let offset = 0;
+const limit = 100;
+let hasMore = true;
+
+while (hasMore) {
+  const response = await autumn.customers.list({ offset, limit });
+  
+  // Process customers
+  for (const customer of response.list) {
+    console.log(customer.id, customer.email);
+  }
+  
+  hasMore = response.has_more;
+  offset += limit;
+}
+```
+
+```python Python
+from autumn import Autumn
+
+autumn = Autumn(api_key=os.environ.get('AUTUMN_API_KEY'))
+
+# Basic list
+customers = autumn.customers.list(
+  offset=0,
+  limit=20
+)
+
+# With filters
+pro_customers = autumn.customers.list(
+  offset=0,
+  limit=20,
+  plans=[
+    {
+      'id': 'pro_plan',
+      'versions': [1, 2]
+    }
+  ],
+  subscription_status='active',
+  search='acme'
+)
+
+# Pagination example
+offset = 0
+limit = 100
+has_more = True
+
+while has_more:
+  response = autumn.customers.list(offset=offset, limit=limit)
+  
+  # Process customers
+  for customer in response['list']:
+    print(customer['id'], customer['email'])
+  
+  has_more = response['has_more']
+  offset += limit
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "list": [
+    {
+      "id": "user_12345",
+      "name": "Alice Johnson",
+      "email": "alice@acme.com",
+      "created_at": 1708272000,
+      "fingerprint": null,
+      "stripe_id": "cus_stripe123",
+      "env": "production",
+      "metadata": {
+        "company": "Acme Corp"
+      },
+      "send_email_receipts": true,
+      "subscriptions": [
+        {
+          "plan_id": "pro_plan",
+          "status": "active",
+          "default": true,
+          "add_on": false,
+          "started_at": 1708272000,
+          "current_period_start": 1708272000,
+          "current_period_end": 1710864000,
+          "trial_ends_at": null,
+          "canceled_at": null,
+          "expires_at": null,
+          "past_due": false,
+          "quantity": 1
+        }
+      ],
+      "scheduled_subscriptions": [],
+      "balances": {}
+    },
+    {
+      "id": "user_67890",
+      "name": "Bob Smith",
+      "email": "bob@acme.com",
+      "created_at": 1708358400,
+      "fingerprint": null,
+      "stripe_id": "cus_stripe456",
+      "env": "production",
+      "metadata": {
+        "company": "Acme Corp"
+      },
+      "send_email_receipts": true,
+      "subscriptions": [
+        {
+          "plan_id": "pro_plan",
+          "status": "active",
+          "default": true,
+          "add_on": false,
+          "started_at": 1708358400,
+          "current_period_start": 1708358400,
+          "current_period_end": 1710950400,
+          "trial_ends_at": null,
+          "canceled_at": null,
+          "expires_at": null,
+          "past_due": false,
+          "quantity": 1
+        }
+      ],
+      "scheduled_subscriptions": [],
+      "balances": {}
+    }
+  ],
+  "has_more": false,
+  "offset": 0,
+  "limit": 20,
+  "total": 2
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+</ResponseExample>
+
+## Notes
+
+- This endpoint uses POST method to support complex filtering in the request body
+- Use `offset` and `limit` for pagination, and check `has_more` to determine if more pages exist
+- The `plans` filter is useful for finding all customers subscribed to specific products
+- Search is case-insensitive and matches partial strings in customer ID, name, or email
+- Each customer in the response includes their full subscription and balance data
+- Maximum limit is 1000 customers per request

@@ -1,0 +1,647 @@
+---
+title: "React SDK"
+description: "React hooks and components for seamless frontend billing integration"
+---
+
+## Installation
+
+Install the Autumn SDK using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install autumn-js
+```
+
+```bash yarn
+yarn add autumn-js
+```
+
+```bash pnpm
+pnpm add autumn-js
+```
+
+```bash bun
+bun add autumn-js
+```
+</CodeGroup>
+
+## Setup
+
+### 1. Configure Backend Handler
+
+First, set up the Autumn handler in your backend to proxy requests securely:
+
+<Tabs>
+  <Tab title="Next.js App Router">
+    ```typescript app/api/autumn/[...all]/route.ts
+    import { autumnHandler } from "autumn-js/next";
+
+    export const { GET, POST, PUT, DELETE } = autumnHandler({
+      secretKey: process.env.AUTUMN_SECRET_KEY!,
+      async getCustomerId(request) {
+        // Your auth logic here
+        const userId = request.headers.get("x-user-id");
+        return userId;
+      },
+    });
+    ```
+  </Tab>
+
+  <Tab title="Next.js Pages Router">
+    ```typescript pages/api/autumn/[...all].ts
+    import { autumnHandler } from "autumn-js/next";
+
+    export default autumnHandler({
+      secretKey: process.env.AUTUMN_SECRET_KEY!,
+      async getCustomerId(request) {
+        const session = await getSession({ req: request });
+        return session?.user?.id;
+      },
+    });
+    ```
+  </Tab>
+
+  <Tab title="Express">
+    ```typescript server.js
+    import { autumnHandler } from "autumn-js/express";
+    import express from "express";
+
+    const app = express();
+
+    app.use("/api/autumn", autumnHandler({
+      secretKey: process.env.AUTUMN_SECRET_KEY!,
+      async getCustomerId(req) {
+        return req.user?.id;
+      },
+    }));
+    ```
+  </Tab>
+
+  <Tab title="Hono">
+    ```typescript app.ts
+    import { autumnHandler } from "autumn-js/hono";
+    import { Hono } from "hono";
+
+    const app = new Hono();
+
+    app.route("/api/autumn", autumnHandler({
+      secretKey: process.env.AUTUMN_SECRET_KEY!,
+      async getCustomerId(c) {
+        return c.get("userId");
+      },
+    }));
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Add AutumnProvider
+
+Wrap your application with the `AutumnProvider`:
+
+<Tabs>
+  <Tab title="Next.js App Router">
+    ```tsx app/layout.tsx
+    import { AutumnProvider } from "autumn-js/react";
+
+    export default function RootLayout({
+      children,
+    }: {
+      children: React.ReactNode;
+    }) {
+      return (
+        <html lang="en">
+          <body>
+            <AutumnProvider>
+              {children}
+            </AutumnProvider>
+          </body>
+        </html>
+      );
+    }
+    ```
+  </Tab>
+
+  <Tab title="Next.js Pages Router">
+    ```tsx pages/_app.tsx
+    import { AutumnProvider } from "autumn-js/react";
+    import type { AppProps } from "next/app";
+
+    export default function App({ Component, pageProps }: AppProps) {
+      return (
+        <AutumnProvider>
+          <Component {...pageProps} />
+        </AutumnProvider>
+      );
+    }
+    ```
+  </Tab>
+
+  <Tab title="Vite / CRA">
+    ```tsx src/App.tsx
+    import { AutumnProvider } from "autumn-js/react";
+
+    function App() {
+      return (
+        <AutumnProvider backendUrl="http://localhost:3000">
+          <YourApp />
+        </AutumnProvider>
+      );
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  If your backend URL differs from your frontend, pass the `backendUrl` prop:
+  ```tsx
+  <AutumnProvider backendUrl="https://api.yourapp.com">
+  ```
+</Note>
+
+## useCustomer Hook
+
+The `useCustomer` hook provides access to the current customer data and all billing methods:
+
+```tsx
+import { useCustomer } from "autumn-js/react";
+
+function MyComponent() {
+  const { customer, attach, check, track, isLoading } = useCustomer();
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>Customer: {customer?.email}</p>
+    </div>
+  );
+}
+```
+
+### Return Values
+
+<ResponseField name="customer" type="Customer | null">
+  The current customer object with all subscription data
+</ResponseField>
+
+<ResponseField name="attach" type="function">
+  Subscribe customer to a product or plan
+</ResponseField>
+
+<ResponseField name="check" type="function">
+  Verify feature access for the customer
+</ResponseField>
+
+<ResponseField name="track" type="function">
+  Record usage events
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  Loading state for customer data
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  Error state if customer fetch failed
+</ResponseField>
+
+### Attach a Product
+
+```tsx
+import { useCustomer } from "autumn-js/react";
+
+function UpgradeButton() {
+  const { attach } = useCustomer();
+  const [loading, setLoading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setLoading(true);
+    try {
+      await attach({
+        productId: "pro_plan",
+        successUrl: window.location.origin + "/success",
+        cancelUrl: window.location.origin + "/pricing",
+      });
+    } catch (error) {
+      console.error("Failed to upgrade:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button onClick={handleUpgrade} disabled={loading}>
+      {loading ? "Processing..." : "Upgrade to Pro"}
+    </button>
+  );
+}
+```
+
+### Check Feature Access
+
+```tsx
+import { useCustomer } from "autumn-js/react";
+import { useEffect, useState } from "react";
+
+function FeatureGate({ featureId, children }) {
+  const { check } = useCustomer();
+  const [hasAccess, setHasAccess] = useState(false);
+  const [balance, setBalance] = useState(0);
+
+  useEffect(() => {
+    async function checkAccess() {
+      const { data } = await check({ featureId });
+      setHasAccess(data.allowed);
+      setBalance(data.balance ?? 0);
+    }
+    checkAccess();
+  }, [featureId, check]);
+
+  if (!hasAccess) {
+    return (
+      <div>
+        <p>This feature requires an upgrade.</p>
+        <UpgradeButton />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div>Remaining: {balance}</div>
+      {children}
+    </>
+  );
+}
+```
+
+### Track Usage
+
+```tsx
+import { useCustomer } from "autumn-js/react";
+
+function AIPromptForm() {
+  const { track, check } = useCustomer();
+  const [prompt, setPrompt] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Check if user has tokens
+    const { data } = await check({
+      featureId: "ai_tokens",
+      requiredBalance: 1000,
+    });
+
+    if (!data.allowed) {
+      alert("Insufficient AI tokens. Please upgrade.");
+      return;
+    }
+
+    // Process the AI request
+    const response = await fetch("/api/ai", {
+      method: "POST",
+      body: JSON.stringify({ prompt }),
+    });
+    const { tokensUsed } = await response.json();
+
+    // Track the usage
+    await track({
+      featureId: "ai_tokens",
+      value: tokensUsed,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Enter your prompt..."
+      />
+      <button type="submit">Generate</button>
+    </form>
+  );
+}
+```
+
+## usePricingTable Hook
+
+Get products with their billing scenarios for the current customer:
+
+```tsx
+import { usePricingTable } from "autumn-js/react";
+
+function PricingPage() {
+  const { products, isLoading } = usePricingTable();
+
+  const buttonText: Record<string, string> = {
+    active: "Current Plan",
+    upgrade: "Upgrade",
+    downgrade: "Downgrade",
+    scheduled: "Scheduled",
+  };
+
+  if (isLoading) return <div>Loading plans...</div>;
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {products.map((product) => (
+        <PricingCard
+          key={product.id}
+          name={product.name}
+          price={product.price}
+          buttonText={buttonText[product.scenario] ?? "Subscribe"}
+          onSelect={() => handleSelect(product.id)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+## PricingTable Component
+
+Drop-in pricing table component with built-in checkout flow:
+
+```tsx
+import { PricingTable } from "autumn-js/react";
+
+export default function PricingPage() {
+  return (
+    <div className="w-full max-w-6xl mx-auto p-8">
+      <h1>Choose Your Plan</h1>
+      <PricingTable
+        checkoutParams={{
+          successUrl: window.location.origin + "/success",
+          cancelUrl: window.location.origin + "/pricing",
+        }}
+      />
+    </div>
+  );
+}
+```
+
+### Customization
+
+You can customize the styling by passing a `className` prop:
+
+```tsx
+<PricingTable
+  className="custom-pricing-table"
+  checkoutParams={{
+    successUrl: "/success",
+  }}
+/>
+```
+
+## Real-World Examples
+
+### Complete Pricing Page
+
+```tsx app/pricing/page.tsx
+import { usePricingTable, useCustomer } from "autumn-js/react";
+import { useState } from "react";
+
+export default function PricingPage() {
+  const { products, isLoading } = usePricingTable();
+  const { attach } = useCustomer();
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  const handleSelectPlan = async (productId: string) => {
+    setSelectedPlan(productId);
+    try {
+      await attach({
+        productId,
+        successUrl: window.location.origin + "/dashboard",
+        cancelUrl: window.location.origin + "/pricing",
+      });
+    } catch (error) {
+      console.error("Failed to subscribe:", error);
+      setSelectedPlan(null);
+    }
+  };
+
+  if (isLoading) {
+    return <div>Loading plans...</div>;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-16">
+      <h1 className="text-4xl font-bold text-center mb-12">
+        Choose Your Plan
+      </h1>
+      <div className="grid md:grid-cols-3 gap-8">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="border rounded-lg p-6 flex flex-col"
+          >
+            <h2 className="text-2xl font-semibold mb-2">{product.name}</h2>
+            <p className="text-gray-600 mb-4">{product.description}</p>
+            <div className="text-3xl font-bold mb-6">
+              ${product.price}
+              <span className="text-sm font-normal">/month</span>
+            </div>
+            <button
+              onClick={() => handleSelectPlan(product.id)}
+              disabled={selectedPlan === product.id}
+              className="mt-auto py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {selectedPlan === product.id
+                ? "Processing..."
+                : product.scenario === "active"
+                  ? "Current Plan"
+                  : "Select Plan"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Usage Dashboard
+
+```tsx app/dashboard/usage/page.tsx
+import { useCustomer } from "autumn-js/react";
+import { useEffect, useState } from "react";
+
+export default function UsageDashboard() {
+  const { check } = useCustomer();
+  const [features, setFeatures] = useState([]);
+
+  useEffect(() => {
+    async function loadUsage() {
+      const featureIds = ["api_calls", "ai_tokens", "storage_gb"];
+      const results = await Promise.all(
+        featureIds.map((id) => check({ featureId: id }))
+      );
+      
+      setFeatures(
+        results.map((result, i) => ({
+          id: featureIds[i],
+          ...result.data,
+        }))
+      );
+    }
+    loadUsage();
+  }, [check]);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Usage Dashboard</h1>
+      {features.map((feature) => (
+        <div key={feature.id} className="border rounded p-4">
+          <h3 className="font-semibold capitalize">
+            {feature.id.replace("_", " ")}
+          </h3>
+          {feature.unlimited ? (
+            <p className="text-green-600">Unlimited</p>
+          ) : (
+            <div>
+              <p>Remaining: {feature.balance}</p>
+              {feature.resetAt && (
+                <p className="text-sm text-gray-600">
+                  Resets on {new Date(feature.resetAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Feature Paywall
+
+```tsx components/FeaturePaywall.tsx
+import { useCustomer } from "autumn-js/react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+interface FeaturePaywallProps {
+  featureId: string;
+  children: React.ReactNode;
+}
+
+export function FeaturePaywall({ featureId, children }: FeaturePaywallProps) {
+  const { check, attach } = useCustomer();
+  const router = useRouter();
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkAccess() {
+      const { data } = await check({ featureId });
+      setHasAccess(data.allowed);
+    }
+    checkAccess();
+  }, [featureId, check]);
+
+  if (hasAccess === null) {
+    return <div>Checking access...</div>;
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold mb-4">Upgrade Required</h2>
+        <p className="mb-6">
+          This feature is not available on your current plan.
+        </p>
+        <button
+          onClick={() => router.push("/pricing")}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          View Plans
+        </button>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+// Usage
+<FeaturePaywall featureId="advanced_analytics">
+  <AdvancedAnalyticsDashboard />
+</FeaturePaywall>
+```
+
+## Best Practices
+
+### 1. Handle Loading States
+
+Always handle loading states for better UX:
+
+```tsx
+const { customer, isLoading } = useCustomer();
+
+if (isLoading) {
+  return <LoadingSpinner />;
+}
+```
+
+### 2. Error Boundaries
+
+Wrap billing components in error boundaries:
+
+```tsx
+import { ErrorBoundary } from "react-error-boundary";
+
+<ErrorBoundary fallback={<div>Failed to load pricing</div>}>
+  <PricingTable />
+</ErrorBoundary>
+```
+
+### 3. Optimistic Updates
+
+Show immediate feedback before API calls complete:
+
+```tsx
+const handleUpgrade = async () => {
+  setOptimisticState("upgrading");
+  try {
+    await attach({ productId: "pro" });
+    setOptimisticState("upgraded");
+  } catch (error) {
+    setOptimisticState("error");
+  }
+};
+```
+
+### 4. Memoize Check Calls
+
+Cache feature checks to avoid unnecessary API calls:
+
+```tsx
+const checkCache = useRef<Map<string, any>>(new Map());
+
+const cachedCheck = useCallback(async (featureId: string) => {
+  if (checkCache.current.has(featureId)) {
+    return checkCache.current.get(featureId);
+  }
+  const result = await check({ featureId });
+  checkCache.current.set(featureId, result);
+  return result;
+}, [check]);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Learn about the backend JavaScript SDK
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/core/attach">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Examples" icon="code" href="/guides/checkout-flows">
+    See more real-world examples
+  </Card>
+  <Card title="TypeScript" icon="code" href="/guides/typescript">
+    TypeScript patterns and types
+  </Card>
+</CardGroup>

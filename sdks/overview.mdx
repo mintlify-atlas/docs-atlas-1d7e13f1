@@ -1,0 +1,265 @@
+---
+title: "SDK Overview"
+description: "Choose the right SDK for your application and get started with Autumn"
+---
+
+## Available SDKs
+
+Autumn provides multiple ways to integrate billing into your application:
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Full-featured SDK for Node.js, Bun, and Deno environments
+  </Card>
+  <Card title="React SDK" icon="react" href="/sdks/react">
+    React hooks and components for seamless frontend integration
+  </Card>
+  <Card title="REST API" icon="code" href="/sdks/rest-api">
+    Direct HTTP access for any language or platform
+  </Card>
+</CardGroup>
+
+## Choosing the Right SDK
+
+### JavaScript SDK
+
+Best for **backend services** and **server-side applications**:
+
+- Node.js, Bun, or Deno backend
+- API routes and serverless functions
+- Direct server-to-server communication
+- Full TypeScript support
+
+**Install**: `npm install autumn-js`
+
+### React SDK
+
+Best for **React applications** with frontend billing logic:
+
+- Next.js, Remix, or React apps
+- User-facing pricing pages
+- In-app subscription management
+- Real-time customer data with hooks
+
+**Install**: `npm install autumn-js` + configure `AutumnProvider`
+
+### REST API
+
+Best for:
+
+- Non-JavaScript environments (Python, Go, Ruby, etc.)
+- Custom integrations
+- Webhook handlers
+- Maximum flexibility
+
+**Authenticate**: Use API keys in `Authorization` header
+
+## Authentication
+
+All SDK methods and API requests require authentication using your secret key.
+
+### Getting Your API Key
+
+1. Log into the [Autumn Dashboard](https://app.useautumn.com)
+2. Navigate to **Settings** → **API Keys**
+3. Generate a new secret key
+4. Store it securely in your environment variables
+
+<Warning>
+  **Never expose your secret key** in client-side code or public repositories. Always use environment variables.
+</Warning>
+
+### Environment Configuration
+
+Add your secret key to your environment:
+
+<CodeGroup>
+```bash .env
+AUTUMN_SECRET_KEY=am_sk_...
+```
+
+```bash .env.local (Next.js)
+AUTUMN_SECRET_KEY=am_sk_...
+```
+</CodeGroup>
+
+## Basic Usage
+
+### Three Core Methods
+
+Autumn's billing system centers around three essential operations:
+
+<AccordionGroup>
+  <Accordion title="attach() - Subscribe to Products" icon="link">
+    Subscribe a customer to a product or plan. Handles upgrades, downgrades, and new subscriptions automatically.
+    
+    ```typescript
+    await autumn.attach({
+      customerId: "user_123",
+      productId: "pro_plan",
+      successUrl: "https://yourapp.com/success"
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="check() - Verify Feature Access" icon="shield-check">
+    Check if a customer has access to a feature before allowing usage.
+    
+    ```typescript
+    const { data } = await autumn.check({
+      customerId: "user_123",
+      featureId: "api_calls"
+    });
+    
+    if (!data.allowed) {
+      // Show upgrade prompt
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="track() - Record Usage" icon="chart-line">
+    Record usage events for metering and enforcement of usage-based limits.
+    
+    ```typescript
+    await autumn.track({
+      customerId: "user_123",
+      featureId: "api_calls",
+      value: 1
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Quick Start Examples
+
+<Tabs>
+  <Tab title="JavaScript">
+    ```typescript
+    import Autumn from "autumn-js";
+
+    const autumn = new Autumn({
+      secretKey: process.env.AUTUMN_SECRET_KEY,
+    });
+
+    // Create a customer
+    await autumn.customers.create({
+      id: "user_123",
+      email: "user@example.com",
+      name: "John Doe"
+    });
+
+    // Attach a product
+    await autumn.attach({
+      customerId: "user_123",
+      productId: "pro_plan",
+      successUrl: "https://yourapp.com/success"
+    });
+
+    // Check access
+    const { data } = await autumn.check({
+      customerId: "user_123",
+      featureId: "advanced_features"
+    });
+
+    // Track usage
+    await autumn.track({
+      customerId: "user_123",
+      featureId: "api_calls",
+      value: 1
+    });
+    ```
+  </Tab>
+
+  <Tab title="React">
+    ```tsx
+    import { AutumnProvider, useCustomer } from "autumn-js/react";
+
+    // Wrap your app
+    function App() {
+      return (
+        <AutumnProvider>
+          <YourApp />
+        </AutumnProvider>
+      );
+    }
+
+    // Use in components
+    function UpgradeButton() {
+      const { attach, check, track, customer } = useCustomer();
+
+      const handleUpgrade = async () => {
+        await attach({
+          productId: "pro_plan",
+          successUrl: window.location.origin + "/success"
+        });
+      };
+
+      return (
+        <button onClick={handleUpgrade}>
+          Upgrade to Pro
+        </button>
+      );
+    }
+    ```
+  </Tab>
+
+  <Tab title="cURL">
+    ```bash
+    # Create a customer
+    curl https://api.useautumn.com/v1/customers/create \
+      -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "id": "user_123",
+        "email": "user@example.com",
+        "name": "John Doe"
+      }'
+
+    # Attach a product
+    curl https://api.useautumn.com/v1/attach \
+      -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "customer_id": "user_123",
+        "product_id": "pro_plan",
+        "success_url": "https://yourapp.com/success"
+      }'
+
+    # Check access
+    curl https://api.useautumn.com/v1/check \
+      -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "customer_id": "user_123",
+        "feature_id": "advanced_features"
+      }'
+
+    # Track usage
+    curl https://api.useautumn.com/v1/track \
+      -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "customer_id": "user_123",
+        "feature_id": "api_calls",
+        "value": 1
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Learn about the full JavaScript API
+  </Card>
+  <Card title="React SDK" icon="react" href="/sdks/react">
+    Build with React hooks and components
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/core/attach">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Authentication" icon="key" href="/resources/authentication">
+    Learn about API keys and security
+  </Card>
+</CardGroup>

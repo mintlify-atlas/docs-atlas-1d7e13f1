@@ -1,0 +1,251 @@
+---
+title: 'Create Customer'
+api: 'POST /customers'
+---
+
+Creates a new customer in your Autumn organization. Customers represent end-users or organizations that purchase your products and features.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header as a Bearer token.
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Query Parameters
+
+<ParamField query="expand" type="string[]" optional>
+  Expand related objects in the response. Available options:
+  - `invoices` - Include customer invoices
+  - `entities` - Include associated entities
+  - `trials_used` - Include trial usage information
+  - `rewards` - Include customer rewards and discounts
+  - `referrals` - Include referral information
+  - `payment_method` - Include payment method details
+</ParamField>
+
+## Request Body
+
+<ParamField body="id" type="string" optional>
+  Your unique identifier for the customer. If not provided, Autumn will generate one automatically.
+</ParamField>
+
+<ParamField body="name" type="string" optional>
+  Customer's name
+</ParamField>
+
+<ParamField body="email" type="string" optional>
+  Customer's email address. Must be a valid email format.
+</ParamField>
+
+<ParamField body="fingerprint" type="string" optional>
+  Unique identifier (e.g., device serial number, hardware ID) to detect duplicate customers and prevent free trial abuse. Use this to identify the same customer across different accounts.
+</ParamField>
+
+<ParamField body="metadata" type="object" optional>
+  Additional custom metadata for the customer as key-value pairs. Useful for storing application-specific data.
+</ParamField>
+
+<ParamField body="stripe_id" type="string" optional>
+  Existing Stripe customer ID if you're already using Stripe. Autumn will link to this customer.
+</ParamField>
+
+<ParamField body="create_in_stripe" type="boolean" optional>
+  Whether to create the customer in Stripe. Defaults to `true` if Stripe is configured.
+</ParamField>
+
+<ParamField body="auto_enable_plan_id" type="string" optional>
+  The ID of a free plan to automatically enable for the customer upon creation.
+</ParamField>
+
+<ParamField body="send_email_receipts" type="boolean" optional>
+  Whether to send email receipts to this customer for payments. Defaults to `true`.
+</ParamField>
+
+## Response
+
+Returns the created customer object.
+
+<ResponseField name="id" type="string">
+  Your unique identifier for the customer
+</ResponseField>
+
+<ResponseField name="autumn_id" type="string">
+  Autumn's internal ID for the customer (only visible with internal flags)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Customer's name
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Customer's email address
+</ResponseField>
+
+<ResponseField name="created_at" type="number">
+  Unix timestamp (in seconds) when the customer was created
+</ResponseField>
+
+<ResponseField name="fingerprint" type="string">
+  Unique device/hardware identifier
+</ResponseField>
+
+<ResponseField name="stripe_id" type="string">
+  Stripe customer ID if connected
+</ResponseField>
+
+<ResponseField name="env" type="string">
+  Environment: `production`, `staging`, or `development`
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata key-value pairs
+</ResponseField>
+
+<ResponseField name="send_email_receipts" type="boolean">
+  Whether email receipts are enabled for this customer
+</ResponseField>
+
+<ResponseField name="subscriptions" type="array">
+  Array of active subscriptions. Each subscription includes:
+  - `plan_id` - The plan identifier
+  - `plan` - Expanded plan object (if available)
+  - `status` - Subscription status: `active`, `scheduled`, or `expired`
+  - `default` - Whether this is the default plan
+  - `add_on` - Whether this is an add-on
+  - `started_at` - When the subscription started
+  - `current_period_start` - Current billing period start
+  - `current_period_end` - Current billing period end
+  - `trial_ends_at` - When the trial ends (if applicable)
+  - `canceled_at` - Cancellation timestamp (if canceled)
+  - `expires_at` - Expiration timestamp (if set to expire)
+  - `past_due` - Whether payment is past due
+  - `quantity` - Number of seats/licenses
+</ResponseField>
+
+<ResponseField name="scheduled_subscriptions" type="array">
+  Array of scheduled subscriptions that will activate in the future
+</ResponseField>
+
+<ResponseField name="balances" type="object">
+  Object mapping feature IDs to their balance information. Each balance includes:
+  - `feature_id` - The feature identifier
+  - `feature` - Expanded feature object (if available)
+  - `unlimited` - Whether the customer has unlimited access
+  - `granted_balance` - Balance granted by active plans
+  - `purchased_balance` - Additional balance purchased separately
+  - `current_balance` - Current available balance
+  - `usage` - Amount of balance used
+  - `overage_allowed` - Whether overage is permitted
+  - `max_purchase` - Maximum purchasable amount
+  - `reset` - Reset schedule information
+  - `plan_id` - Associated plan ID
+  - `breakdown` - Detailed breakdown by plan
+  - `rollovers` - Rollover balance details
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.autumnai.com/customers \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "user_12345",
+    "name": "Alice Johnson",
+    "email": "alice@example.com",
+    "metadata": {
+      "company": "Acme Corp",
+      "plan_tier": "enterprise"
+    },
+    "send_email_receipts": true
+  }'
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/sdk';
+
+const autumn = new Autumn({
+  apiKey: process.env.AUTUMN_API_KEY
+});
+
+const customer = await autumn.customers.create({
+  id: 'user_12345',
+  name: 'Alice Johnson',
+  email: 'alice@example.com',
+  metadata: {
+    company: 'Acme Corp',
+    plan_tier: 'enterprise'
+  },
+  send_email_receipts: true
+});
+```
+
+```python Python
+from autumn import Autumn
+
+autumn = Autumn(api_key=os.environ.get('AUTUMN_API_KEY'))
+
+customer = autumn.customers.create(
+  id='user_12345',
+  name='Alice Johnson',
+  email='alice@example.com',
+  metadata={
+    'company': 'Acme Corp',
+    'plan_tier': 'enterprise'
+  },
+  send_email_receipts=True
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "id": "user_12345",
+  "name": "Alice Johnson",
+  "email": "alice@example.com",
+  "created_at": 1708272000,
+  "fingerprint": null,
+  "stripe_id": "cus_stripe123",
+  "env": "production",
+  "metadata": {
+    "company": "Acme Corp",
+    "plan_tier": "enterprise"
+  },
+  "send_email_receipts": true,
+  "subscriptions": [],
+  "scheduled_subscriptions": [],
+  "balances": {}
+}
+```
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "not a valid email address"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+</ResponseExample>
+
+## Notes
+
+- Customer IDs must be unique within your organization
+- If no ID is provided, Autumn generates a unique identifier
+- Default products and trial plans are automatically attached based on your organization settings
+- Fingerprint is recommended for preventing trial abuse across multiple accounts

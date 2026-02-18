@@ -1,0 +1,379 @@
+---
+title: "Customers"
+description: "Understanding customer management and multi-tenancy in Autumn"
+---
+
+## Overview
+
+In Autumn, **customers** represent the individuals or organizations that subscribe to your products. The customer model handles identity, billing relationships, and serves as the foundation for entitlement management.
+
+## Customer Model
+
+The customer object in Autumn contains:
+
+```typescript
+{
+  internal_id: string;      // Autumn's internal identifier
+  id: string;               // Your customer ID
+  org_id: string;           // Your organization ID
+  name: string;             // Customer name
+  email: string;            // Customer email
+  metadata: Record<string, unknown>;  // Custom metadata
+  env: "test" | "live";    // Environment
+  processor: {              // Payment processor link
+    type: "stripe";
+    id: string;             // Stripe customer ID
+  };
+  created_at: number;       // Unix timestamp
+  send_email_receipts: boolean;  // Email receipt preference
+}
+```
+
+## Stripe Integration
+
+### Processor Configuration
+
+Every Autumn customer links to a Stripe customer:
+
+```typescript
+// From cusTable.ts
+processor: {
+  type: "stripe";
+  id: string;  // Stripe customer ID (e.g., "cus_xxx")
+}
+```
+
+This connection enables:
+- Payment method management
+- Subscription billing through Stripe
+- Invoice generation and payment
+- Payment history tracking
+
+### Multi-processor Support
+
+Autumn supports multiple payment processors per customer:
+
+```typescript
+processors: {
+  stripe?: { id: string };
+  revenuecat?: { id: string };
+  // Additional processors
+}
+```
+
+This allows you to:
+- Support multiple payment methods
+- Migrate between processors
+- Handle platform-specific billing (e.g., iOS via RevenueCat)
+
+## Customer Creation
+
+### Creating Customers
+
+Customers can be created in several ways:
+
+<Tabs>
+  <Tab title="API">
+    ```bash
+    POST /customers
+    {
+      "id": "user_123",
+      "email": "customer@example.com",
+      "name": "Jane Doe"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Automatic Creation">
+    Customers are automatically created when:
+    - Processing checkout sessions
+    - Handling Stripe webhooks
+    - Using `/attach` with a new customer ID
+  </Tab>
+  
+  <Tab title="Dashboard">
+    Create customers directly in the Autumn dashboard for manual setup or testing.
+  </Tab>
+</Tabs>
+
+### Customer ID Strategy
+
+You control the customer IDs:
+
+<AccordionGroup>
+  <Accordion title="Use your existing IDs">
+    Map directly to your user IDs:
+    ```json
+    { "id": "user_12345" }
+    ```
+  </Accordion>
+  
+  <Accordion title="Let Autumn generate IDs">
+    Omit the ID and Autumn will create one:
+    ```json
+    { "email": "customer@example.com" }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use email as identifier">
+    For customerless scenarios, use email:
+    ```json
+    { "email": "customer@example.com", "id": null }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Customer IDs must be unique within an organization and environment.
+</Note>
+
+## Customer Fingerprinting
+
+Autumn supports device fingerprinting for fraud prevention:
+
+```typescript
+fingerprint: string;  // Browser/device fingerprint
+```
+
+Use this to:
+- Detect duplicate accounts
+- Prevent free trial abuse
+- Track suspicious activity
+
+## Multi-tenancy with Entities
+
+### What are Entities?
+
+Entities enable multi-tenancy by allowing customers to have multiple sub-accounts or workspaces:
+
+```typescript
+// From entityTable.ts
+entity: {
+  id: string;                    // Entity identifier
+  internal_id: string;           // Internal ID
+  internal_customer_id: string;  // Parent customer
+  name: string;                  // Entity name
+  internal_feature_id: string;   // Optional: scoped to feature
+  deleted: boolean;              // Soft delete flag
+}
+```
+
+### Entity Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Team Workspaces" icon="users">
+    One customer, multiple teams with separate entitlements
+  </Card>
+  
+  <Card title="Project-based Billing" icon="folder">
+    Track usage and limits per project
+  </Card>
+  
+  <Card title="Multi-tenant SaaS" icon="building">
+    Separate tenants under one customer account
+  </Card>
+  
+  <Card title="Resource Isolation" icon="box">
+    Isolate usage limits per entity
+  </Card>
+</CardGroup>
+
+### Entity-scoped Entitlements
+
+Entitlements can be scoped to entities:
+
+```typescript
+// From cusEntTable.ts
+customer_entitlement: {
+  internal_entity_id: string;  // Scoped to specific entity
+  balance: number;             // Entity-specific balance
+  entities: {                  // Per-entity balances
+    [entityId: string]: {
+      balance: number;
+      unlimited: boolean;
+    }
+  }
+}
+```
+
+This enables:
+- **Per-entity usage tracking**: Each entity has its own balance
+- **Entity-level limits**: Enforce limits per workspace/tenant
+- **Isolated billing**: Track costs per entity
+
+**Example**: Track API calls per workspace:
+
+```typescript
+// Customer has 3 workspaces
+{
+  "feature_id": "api-calls",
+  "entities": {
+    "workspace-1": { "balance": 8500, "unlimited": false },
+    "workspace-2": { "balance": 12000, "unlimited": false },
+    "workspace-3": { "balance": 3200, "unlimited": false }
+  }
+}
+```
+
+## Customer Products
+
+Customers subscribe to products via **customer_products**:
+
+```typescript
+// From cusProductTable.ts
+customer_product: {
+  id: string;
+  internal_customer_id: string;
+  internal_product_id: string;
+  internal_entity_id: string;        // Optional: entity-scoped
+  status: string;                    // "active", "canceled", "scheduled"
+  created_at: number;
+  starts_at: number;
+  ended_at: number;
+  canceled_at: number;
+  trial_ends_at: number;
+  quantity: number;                  // For seat-based pricing
+  subscription_ids: string[];        // Stripe subscription IDs
+  collection_method: string;         // "charge_automatically" | "send_invoice"
+}
+```
+
+### Customer Product Lifecycle
+
+<Steps>
+  <Step title="New">
+    Customer has no products yet
+  </Step>
+  
+  <Step title="Scheduled">
+    Product attached but not yet active (`scheduled: true`)
+  </Step>
+  
+  <Step title="Active">
+    Product is live and entitlements are active
+  </Step>
+  
+  <Step title="Canceled">
+    Product canceled but may have end date in future
+  </Step>
+  
+  <Step title="Ended">
+    Product expired and entitlements removed
+  </Step>
+</Steps>
+
+## Customer Metadata
+
+Store custom data on customers:
+
+```typescript
+metadata: {
+  company: "Acme Corp";
+  sales_rep: "john@example.com";
+  signup_source: "website";
+  // Any custom fields
+}
+```
+
+Metadata is:
+- Synced to Stripe
+- Searchable via API
+- Returned with customer objects
+- Preserved across updates
+
+## Email Receipts
+
+Control email receipt delivery:
+
+```typescript
+send_email_receipts: boolean;  // Default: false
+```
+
+When enabled, Autumn sends email receipts via Stripe after successful payments.
+
+## Environment Separation
+
+Customers are environment-specific:
+
+```typescript
+env: "test" | "live";
+```
+
+This means:
+- Test customers only exist in test mode
+- Production customers only in live mode
+- Same ID can exist in both environments independently
+
+<Warning>
+  Customer data in test mode is completely separate from live mode. Use test mode for development and testing.
+</Warning>
+
+## Customer Constraints
+
+### Unique Constraints
+
+The following must be unique per organization and environment:
+
+```typescript
+// From cusTable.ts
+unique("cus_id_constraint").on(
+  table.org_id,
+  table.id,
+  table.env
+)
+```
+
+### Email Uniqueness
+
+When `id` is `NULL`, only one customer per email is allowed:
+
+```typescript
+// Ensures one customer per email when ID is null
+uniqueIndex("customers_email_null_id_unique")
+  .on(table.org_id, table.env, lower(table.email))
+  .where(table.id IS NULL)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use consistent IDs">
+    Map customer IDs directly to your user IDs for easy reference and debugging.
+  </Accordion>
+  
+  <Accordion title="Set email addresses">
+    Always provide email addresses for payment notifications and customer communication.
+  </Accordion>
+  
+  <Accordion title="Leverage entities for multi-tenancy">
+    Use entities when customers need multiple workspaces or isolated usage tracking.
+  </Accordion>
+  
+  <Accordion title="Store relevant metadata">
+    Use metadata to store context like signup source, sales rep, or custom attributes.
+  </Accordion>
+  
+  <Accordion title="Handle deleted customers gracefully">
+    Consider soft deletes and data retention policies before removing customers.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Products & Plans" icon="box" href="/concepts/products-and-plans">
+    Learn about products customers can subscribe to
+  </Card>
+  
+  <Card title="Features & Entitlements" icon="key" href="/concepts/features-and-entitlements">
+    Understand what customers can access
+  </Card>
+  
+  <Card title="Create Customer" icon="plus" href="/api/customers/create">
+    API reference for customer creation
+  </Card>
+  
+  <Card title="Manage Entities" icon="folder" href="/api/entities/create">
+    Create and manage customer entities
+  </Card>
+</CardGroup>

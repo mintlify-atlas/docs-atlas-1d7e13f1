@@ -1,0 +1,100 @@
+---
+title: 'Create Entity'
+openapi: 'POST /customers/{customer_id}/entities'
+---
+
+Create a new entity for a customer. Entities represent sub-accounts or units within a customer account that can have their own balances and subscriptions.
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The ID of the customer to create the entity for
+</ParamField>
+
+## Request Body
+
+<ParamField path="id" type="string">
+  The ID of the entity. Can be a string or number. If null, an ID will be auto-generated.
+</ParamField>
+
+<ParamField path="name" type="string">
+  The name of the entity
+</ParamField>
+
+<ParamField path="feature_id" type="string" required>
+  The ID of the feature this entity is associated with
+</ParamField>
+
+<ParamField path="customer_data" type="object">
+  Additional customer data to store with the entity. Can include any custom fields.
+</ParamField>
+
+## Response
+
+Returns the created entity object.
+
+<ResponseField name="id" type="string">
+  The ID of the entity
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The name of the entity
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  The parent customer ID
+</ResponseField>
+
+<ResponseField name="feature_id" type="string">
+  The associated feature ID
+</ResponseField>
+
+<ResponseField name="customer_data" type="object">
+  Custom customer data
+</ResponseField>
+
+<ResponseField name="subscriptions" type="array">
+  Plans associated with this entity (if expanded)
+</ResponseField>
+
+<ResponseField name="scheduled_subscriptions" type="array">
+  Scheduled future subscriptions
+</ResponseField>
+
+<ResponseField name="balances" type="object">
+  Features and balances associated with this entity (if expanded)
+</ResponseField>
+
+<ResponseField name="invoices" type="array">
+  Invoices for this entity (only included when expand=invoices)
+</ResponseField>
+
+## Example
+
+```json Request
+{
+  "id": "workspace_1",
+  "name": "Production Workspace",
+  "feature_id": "workspaces",
+  "customer_data": {
+    "region": "us-east-1",
+    "tier": "premium"
+  }
+}
+```
+
+```json Response
+{
+  "id": "workspace_1",
+  "name": "Production Workspace",
+  "customer_id": "cus_123",
+  "feature_id": "workspaces",
+  "customer_data": {
+    "region": "us-east-1",
+    "tier": "premium"
+  },
+  "subscriptions": [],
+  "scheduled_subscriptions": [],
+  "balances": {}
+}
+```

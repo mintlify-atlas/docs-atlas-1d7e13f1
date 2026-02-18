@@ -1,0 +1,117 @@
+---
+title: 'Get Balances'
+openapi: 'GET /balances/list'
+---
+
+Retrieve all balances for a specific customer. Returns customer entitlements where the entitlement has no associated product (standalone balances).
+
+## Query Parameters
+
+<ParamField query="customer_id" type="string" required>
+  The customer ID to retrieve balances for
+</ParamField>
+
+## Response
+
+<ResponseField name="balances" type="array">
+  Array of balance objects
+  
+  <Expandable title="Balance Object">
+    <ResponseField name="id" type="string">
+      The customer entitlement ID
+    </ResponseField>
+    
+    <ResponseField name="internal_customer_id" type="string">
+      Internal customer identifier
+    </ResponseField>
+    
+    <ResponseField name="entitlement_id" type="string">
+      The entitlement ID
+    </ResponseField>
+    
+    <ResponseField name="customer_product_id" type="string">
+      Customer product ID if associated with a subscription
+    </ResponseField>
+    
+    <ResponseField name="entitlement" type="object">
+      The entitlement details
+      
+      <Expandable title="Entitlement">
+        <ResponseField name="id" type="string">
+          Entitlement ID
+        </ResponseField>
+        
+        <ResponseField name="internal_feature_id" type="string">
+          Internal feature identifier
+        </ResponseField>
+        
+        <ResponseField name="feature" type="object">
+          Feature details including id, name, type, and configuration
+        </ResponseField>
+        
+        <ResponseField name="granted_balance" type="number">
+          The granted balance amount
+        </ResponseField>
+        
+        <ResponseField name="unlimited" type="boolean">
+          Whether the balance is unlimited
+        </ResponseField>
+        
+        <ResponseField name="reset_interval" type="string">
+          Reset interval if configured
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="current_balance" type="number">
+      The current remaining balance
+    </ResponseField>
+    
+    <ResponseField name="usage" type="number">
+      Current usage amount
+    </ResponseField>
+    
+    <ResponseField name="next_reset_at" type="number">
+      Unix timestamp (milliseconds) of next reset
+    </ResponseField>
+    
+    <ResponseField name="expires_at" type="number">
+      Unix timestamp (milliseconds) when the balance expires
+    </ResponseField>
+    
+    <ResponseField name="customer_product" type="object">
+      Associated customer product if any
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```bash Request
+curl -X GET "https://api.useautumn.com/v1/balances/list?customer_id=cus_123" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json Response
+{
+  "balances": [
+    {
+      "id": "ce_abc123",
+      "entitlement": {
+        "id": "ent_xyz789",
+        "feature": {
+          "id": "api_calls",
+          "name": "API Calls",
+          "type": "single_use"
+        },
+        "granted_balance": 1000,
+        "unlimited": false,
+        "reset_interval": "month"
+      },
+      "current_balance": 750,
+      "usage": 250,
+      "next_reset_at": 1709251200000
+    }
+  ]
+}
+```

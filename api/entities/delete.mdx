@@ -1,0 +1,39 @@
+---
+title: 'Delete Entity'
+openapi: 'DELETE /customers/{customer_id}/entities/{entity_id}'
+---
+
+Delete an entity from a customer account. This will remove the entity and all associated data.
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The ID of the customer
+</ParamField>
+
+<ParamField path="entity_id" type="string" required>
+  The ID of the entity to delete
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the entity was deleted successfully
+</ResponseField>
+
+## Example
+
+```bash Request
+curl -X DELETE "https://api.useautumn.com/v1/customers/cus_123/entities/workspace_1" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json Response
+{
+  "success": true
+}
+```
+
+<Warning>
+  Deleting an entity is permanent and cannot be undone. All subscriptions, balances, and data associated with the entity will be removed.
+</Warning>

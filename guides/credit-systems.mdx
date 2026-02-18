@@ -1,0 +1,763 @@
+---
+title: "Credit Systems"
+description: "Build flexible credit-based billing with top-ups and balance management"
+---
+
+## Overview
+
+Credit systems allow customers to purchase credits upfront that can be used across multiple features. This provides flexibility and simplifies billing for variable usage patterns.
+
+## When to Use Credit Systems
+
+- **Multi-feature products**: One balance for many features (AI credits for chat, image gen, transcription)
+- **Prepaid models**: Customers buy credits upfront instead of monthly billing
+- **Pay-as-you-go**: No subscription commitment, pure consumption
+- **Enterprise self-service**: Departments manage their own credit pools
+- **Gift cards / promotional credits**: Issue credits as marketing incentives
+
+## Setting Up a Credit System
+
+<Steps>
+  <Step title="Create a credit feature">
+    Create a feature to represent your credit balance:
+
+    ```typescript
+    const creditFeature = await fetch('https://api.useautumn.com/features', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        feature_id: 'ai_credits',
+        name: 'AI Credits',
+        type: 'credit',
+        description: 'Credits that can be used across all AI features'
+      })
+    });
+    ```
+  </Step>
+
+  <Step title="Create metered features that consume credits">
+    Define the features that will draw from the credit balance:
+
+    ```typescript
+    const features = [
+      {
+        feature_id: 'text_generation',
+        name: 'Text Generation',
+        cost_per_use: 10  // 10 credits per generation
+      },
+      {
+        feature_id: 'image_generation', 
+        name: 'Image Generation',
+        cost_per_use: 50  // 50 credits per image
+      },
+      {
+        feature_id: 'voice_synthesis',
+        name: 'Voice Synthesis',
+        cost_per_use: 25  // 25 credits per minute
+      }
+    ];
+
+    for (const feature of features) {
+      await fetch('https://api.useautumn.com/features', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(feature)
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Create credit packages as products">
+    Define purchasable credit packages:
+
+    ```typescript
+    const creditPackages = [
+      {
+        plan_id: 'starter_credits',
+        name: 'Starter Pack',
+        price: { amount: 1000 },  // $10.00
+        items: [{
+          feature_id: 'ai_credits',
+          included: 1000,  // 1,000 credits
+          unlimited: false,
+          reset: null,  // No reset - credits don't expire
+          price: null   // One-time purchase, no recurring charge
+        }]
+      },
+      {
+        plan_id: 'pro_credits',
+        name: 'Pro Pack',
+        price: { amount: 9000 },  // $90.00 (10% discount)
+        items: [{
+          feature_id: 'ai_credits',
+          included: 10000,  // 10,000 credits
+          unlimited: false,
+          reset: null,
+          price: null
+        }]
+      },
+      {
+        plan_id: 'enterprise_credits',
+        name: 'Enterprise Pack',
+        price: { amount: 80000 },  // $800.00 (20% discount)
+        items: [{
+          feature_id: 'ai_credits',
+          included: 100000,  // 100,000 credits
+          unlimited: false,
+          reset: null,
+          price: null
+        }]
+      }
+    ];
+    ```
+
+    <Note>
+      Setting `reset: null` means credits never expire. Set a reset interval if you want recurring credit grants.
+    </Note>
+  </Step>
+
+  <Step title="Implement credit consumption">
+    Deduct credits when features are used:
+
+    ```typescript
+    const consumeCredits = async ({
+      customerId,
+      feature,
+      creditCost,
+      metadata
+    }: {
+      customerId: string;
+      feature: string;
+      creditCost: number;
+      metadata?: Record<string, any>;
+    }) => {
+      // Check if customer has enough credits
+      const checkResponse = await fetch('https://api.useautumn.com/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: 'ai_credits',
+          required_balance: creditCost
+        })
+      });
+
+      const checkData = await checkResponse.json();
+
+      if (!checkData.allowed) {
+        throw new Error('Insufficient credits');
+      }
+
+      // Consume the credits
+      const trackResponse = await fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: 'ai_credits',
+          value: creditCost,
+          properties: {
+            consumed_by: feature,
+            ...metadata
+          }
+        })
+      });
+
+      return await trackResponse.json();
+    };
+
+    // Usage
+    await consumeCredits({
+      customerId: 'cus_123',
+      feature: 'image_generation',
+      creditCost: 50,
+      metadata: {
+        image_size: '1024x1024',
+        prompt_length: 125
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+## Credit Top-Ups
+
+### Self-Service Top-Up Flow
+
+Allow customers to purchase additional credits:
+
+```typescript
+const topUpCredits = async (customerId: string, packageId: string) => {
+  // Use /attach to add credits to existing balance
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: packageId,  // e.g., 'pro_credits'
+      success_url: 'https://yourapp.com/credits/success'
+    })
+  });
+
+  const data = await response.json();
+
+  if (data.checkout_url) {
+    // Redirect to checkout
+    window.location.href = data.checkout_url;
+  } else {
+    // Credits added successfully
+    console.log('Credits added:', data);
+  }
+};
+```
+
+### Automatic Top-Up
+
+Automatically purchase credits when balance is low:
+
+```typescript
+const checkAndTopUp = async (customerId: string) => {
+  // Check current balance
+  const checkResponse = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'ai_credits'
+    })
+  });
+
+  const { balance } = await checkResponse.json();
+
+  // If balance is below threshold, top up
+  const THRESHOLD = 100;
+  if (balance.current_balance < THRESHOLD) {
+    await fetch('https://api.useautumn.com/attach', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        product_id: 'starter_credits'  // Auto-purchase starter pack
+      })
+    });
+  }
+};
+```
+
+<Warning>
+  Always get customer consent before implementing automatic top-ups. Consider requiring explicit opt-in and setting spending limits.
+</Warning>
+
+## Credit Consumption Patterns
+
+### Dynamic Credit Cost
+
+Calculate credit cost based on usage parameters:
+
+```typescript
+const generateImage = async ({
+  customerId,
+  size,
+  quality
+}: {
+  customerId: string;
+  size: '512x512' | '1024x1024' | '2048x2048';
+  quality: 'standard' | 'hd';
+}) => {
+  // Calculate credit cost
+  const sizeCosts = {
+    '512x512': 25,
+    '1024x1024': 50,
+    '2048x2048': 100
+  };
+  
+  const qualityMultiplier = quality === 'hd' ? 2 : 1;
+  const creditCost = sizeCosts[size] * qualityMultiplier;
+
+  // Check balance first
+  const checkResponse = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'ai_credits',
+      required_balance: creditCost
+    })
+  });
+
+  const checkData = await checkResponse.json();
+
+  if (!checkData.allowed) {
+    return {
+      error: 'insufficient_credits',
+      required: creditCost,
+      available: checkData.balance?.current_balance || 0,
+      message: `This generation requires ${creditCost} credits, but you only have ${checkData.balance?.current_balance || 0}`
+    };
+  }
+
+  try {
+    // Generate the image
+    const image = await generateImageWithAI({ size, quality });
+
+    // Deduct credits on success
+    await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'ai_credits',
+        value: creditCost,
+        properties: {
+          feature: 'image_generation',
+          size,
+          quality,
+          cost: creditCost
+        }
+      })
+    });
+
+    return { image, creditsUsed: creditCost };
+  } catch (error) {
+    // Don't deduct credits if generation failed
+    throw error;
+  }
+};
+```
+
+### Credit Refunds
+
+Return credits if an operation fails or is canceled:
+
+```typescript
+const refundCredits = async ({
+  customerId,
+  amount,
+  reason
+}: {
+  customerId: string;
+  amount: number;
+  reason: string;
+}) => {
+  // Track negative value to add credits back
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'ai_credits',
+      value: -amount,  // Negative value increases balance
+      properties: {
+        type: 'refund',
+        reason: reason
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Usage
+await refundCredits({
+  customerId: 'cus_123',
+  amount: 50,
+  reason: 'Image generation failed'
+});
+```
+
+### Multi-Feature Credit Usage
+
+Track which features consumed credits:
+
+```typescript
+const trackCreditUsage = async ({
+  customerId,
+  feature,
+  credits
+}: {
+  customerId: string;
+  feature: string;
+  credits: number;
+}) => {
+  // Deduct from main credit balance
+  await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'ai_credits',
+      value: credits,
+      properties: {
+        consumed_by: feature,
+        timestamp: Date.now()
+      }
+    })
+  });
+
+  // Also track on the specific feature for analytics
+  await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: feature,
+      value: 1,  // Track usage count
+      properties: {
+        credits_consumed: credits
+      }
+    })
+  });
+};
+```
+
+## Balance Management
+
+### Check Credit Balance
+
+```typescript
+const getCreditBalance = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'ai_credits'
+    })
+  });
+
+  const data = await response.json();
+  
+  return {
+    balance: data.balance?.current_balance || 0,
+    granted: data.balance?.granted_balance || 0,
+    purchased: data.balance?.purchased_balance || 0,
+    usage: data.balance?.usage || 0
+  };
+};
+```
+
+### Display Credit Balance to Users
+
+```tsx
+import React, { useEffect, useState } from 'react';
+
+interface CreditBalance {
+  balance: number;
+  granted: number;
+  purchased: number;
+  usage: number;
+}
+
+const CreditBalanceCard: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const [credits, setCredits] = useState<CreditBalance | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const response = await fetch('/api/credits/balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_id: customerId })
+        });
+        const data = await response.json();
+        setCredits(data);
+      } catch (error) {
+        console.error('Failed to fetch credit balance:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBalance();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+  }, [customerId]);
+
+  if (loading) return <div>Loading credits...</div>;
+  if (!credits) return <div>Unable to load credits</div>;
+
+  const isLow = credits.balance < 100;
+
+  return (
+    <div className={`credit-card ${isLow ? 'low-balance' : ''}`}>
+      <div className="credit-header">
+        <h3>AI Credits</h3>
+        <span className="credit-amount">{credits.balance.toLocaleString()}</span>
+      </div>
+      
+      {isLow && (
+        <div className="low-balance-warning">
+          ⚠️ Your credit balance is low
+        </div>
+      )}
+      
+      <div className="credit-breakdown">
+        <div>
+          <span>Total granted:</span>
+          <span>{credits.granted.toLocaleString()}</span>
+        </div>
+        <div>
+          <span>Used:</span>
+          <span>{credits.usage.toLocaleString()}</span>
+        </div>
+      </div>
+      
+      <button 
+        onClick={() => window.location.href = '/credits/purchase'}
+        className="top-up-button"
+      >
+        Top Up Credits
+      </button>
+    </div>
+  );
+};
+```
+
+### Grant Promotional Credits
+
+Give free credits for promotions or support:
+
+```typescript
+const grantPromotionalCredits = async ({
+  customerId,
+  amount,
+  reason
+}: {
+  customerId: string;
+  amount: number;
+  reason: string;
+}) => {
+  // Create a custom one-time product for the credit grant
+  const response = await fetch('https://api.useautumn.com/attach', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      is_custom: true,
+      items: [{
+        feature_id: 'ai_credits',
+        included: amount,
+        unlimited: false,
+        reset: null,
+        price: null  // Free
+      }],
+      metadata: {
+        type: 'promotional',
+        reason: reason,
+        granted_at: new Date().toISOString()
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Usage: Grant 500 credits for feedback
+await grantPromotionalCredits({
+  customerId: 'cus_123',
+  amount: 500,
+  reason: 'Thank you for your feedback!'
+});
+```
+
+## Subscription + Credits Hybrid
+
+Combine monthly subscriptions with credit systems:
+
+```typescript
+const hybridPlan = {
+  plan_id: 'pro_monthly',
+  name: 'Pro Plan',
+  price: {
+    amount: 4900,  // $49/month base subscription
+    interval: 'month'
+  },
+  items: [
+    {
+      // Monthly credit grant
+      feature_id: 'ai_credits',
+      included: 5000,  // 5,000 credits per month
+      unlimited: false,
+      reset: {
+        interval: 'month',
+        interval_count: 1
+      },
+      price: null  // Included in base price
+    },
+    {
+      // Additional features
+      feature_id: 'team_members',
+      included: 5,
+      unlimited: false,
+      price: {
+        amount: 1000,  // $10 per additional member
+        billing_units: 1,
+        billing_method: 'per_unit',
+        interval: 'month'
+      }
+    }
+  ]
+};
+```
+
+### Rollover Credits
+
+Allow unused credits to roll over:
+
+```typescript
+{
+  feature_id: 'ai_credits',
+  included: 5000,
+  reset: {
+    interval: 'month',
+    interval_count: 1
+  },
+  rollover: {
+    max: 10000,  // Max 10,000 credits can roll over
+    expiry_duration_type: 'none',  // Never expire
+    expiry_duration_length: null
+  }
+}
+```
+
+<Note>
+  Setting `rollover.max: null` allows unlimited rollover. Set a number to cap accumulated credits.
+</Note>
+
+## Analytics and Reporting
+
+### Credit Usage Analytics
+
+```typescript
+const getCreditUsageAnalytics = async (customerId: string) => {
+  const response = await fetch(
+    `https://api.useautumn.com/events/aggregate?customer_id=${customerId}&feature_id=ai_credits&range=30d`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+
+  const data = await response.json();
+  
+  // Analyze usage by feature
+  const usageByFeature: Record<string, number> = {};
+  
+  data.events?.forEach((event: any) => {
+    const feature = event.properties?.consumed_by;
+    if (feature) {
+      usageByFeature[feature] = (usageByFeature[feature] || 0) + event.value;
+    }
+  });
+
+  return {
+    totalCreditsUsed: data.total_usage,
+    usageByFeature,
+    averagePerDay: data.total_usage / 30,
+    projectedMonthly: (data.total_usage / 30) * 30
+  };
+};
+```
+
+## Best Practices
+
+<Tip>
+  **Offer volume discounts** on larger credit packages to encourage bigger purchases (e.g., 10% off for 10k credits, 20% off for 100k).
+</Tip>
+
+<Warning>
+  **Never deduct credits before confirming the operation succeeded**. Always perform the action first, then track usage on success.
+</Warning>
+
+<Note>
+  **Make credit costs transparent**. Display the credit cost before the user commits to an action.
+</Note>
+
+### Pricing Strategy
+
+1. **Price per credit consistency**: Keep credit value consistent (1 credit = $0.01)
+2. **Feature pricing**: Charge different credit amounts based on computational cost
+3. **Bulk discounts**: Incentivize larger purchases with better rates
+4. **Expiration policy**: Consider whether credits expire or roll over indefinitely
+
+### User Experience
+
+1. **Show credit balance prominently**: Always visible in UI
+2. **Warn before expensive operations**: "This will cost 500 credits"
+3. **Prevent surprise depletion**: Warning at 80% and 90% usage
+4. **Easy top-up flow**: One-click purchase, saved payment methods
+5. **Usage history**: Let customers see what consumed their credits
+
+### Technical Implementation
+
+1. **Atomic operations**: Use `/check` + `/track` to prevent overdraft
+2. **Idempotency**: Always use idempotency keys for credit operations
+3. **Graceful degradation**: Handle low balance scenarios cleanly
+4. **Async tracking**: Don't block user operations waiting for tracking
+5. **Audit trail**: Log all credit transactions for debugging
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Usage-Based Billing" icon="chart-line" href="/guides/usage-based-billing">
+    Implement metered billing
+  </Card>
+  
+  <Card title="Managing Subscriptions" icon="rotate" href="/guides/managing-subscriptions">
+    Handle upgrades and downgrades
+  </Card>
+  
+  <Card title="Checkout Flows" icon="credit-card" href="/guides/checkout-flows">
+    Implement payment flows
+  </Card>
+  
+  <Card title="Track API" icon="code" href="/api/core/track">
+    Track usage documentation
+  </Card>
+</CardGroup>

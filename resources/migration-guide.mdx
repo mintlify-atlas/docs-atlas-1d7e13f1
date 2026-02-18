@@ -1,0 +1,400 @@
+---
+title: 'Migration Guide'
+description: 'Step-by-step guides for upgrading between API versions'
+---
+
+## Overview
+
+This guide helps you migrate between different versions of the Autumn API. We provide backward compatibility, but upgrading to newer versions gives you access to improved features and better performance.
+
+<Note>
+  Autumn maintains backward compatibility through API version headers, so existing integrations continue to work without changes.
+</Note>
+
+## Migration Paths
+
+<CardGroup cols={2}>
+  <Card title="v1.1 → v1.2" icon="arrow-right" href="#migrating-from-v11-to-v12">
+    Latest version with feature breakdown structure
+  </Card>
+  <Card title="v1.0 → v1.2" icon="arrow-right" href="#migrating-from-v10-to-v12">
+    Upgrade to the latest version
+  </Card>
+</CardGroup>
+
+---
+
+## Migrating from v1.1 to v1.2
+
+### Overview
+
+Version 1.2 introduces a new feature representation with breakdown arrays, providing better support for multi-interval features and more detailed usage information.
+
+### Key Changes
+
+<AccordionGroup>
+  <Accordion title="Features: Array → Object with Breakdown" icon="layer-group">
+    **v1.1 Format:**
+    ```json
+    {
+      "features": [
+        {
+          "feature_id": "ai_tokens",
+          "interval": "month",
+          "interval_count": 1,
+          "balance": 1000,
+          "usage": 250,
+          "included_usage": 1000,
+          "next_reset_at": 1708300800000
+        }
+      ]
+    }
+    ```
+    
+    **v1.2 Format:**
+    ```json
+    {
+      "features": {
+        "ai_tokens": {
+          "id": "ai_tokens",
+          "type": "usage",
+          "name": "AI Tokens",
+          "breakdown": [
+            {
+              "interval": "month",
+              "interval_count": 1,
+              "balance": 1000,
+              "usage": 250,
+              "included_usage": 1000,
+              "next_reset_at": 1708300800000,
+              "usage_limit": 1000,
+              "rollovers": 0
+            }
+          ]
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="CheckResult: Flattened → Nested Feature Fields" icon="check">
+    **v1.1 Format:**
+    ```json
+    {
+      "allowed": true,
+      "customer_id": "cus_123",
+      "feature_id": "ai_tokens",
+      "interval": "month",
+      "balance": 1000,
+      "usage": 250
+    }
+    ```
+    
+    **v1.2 Format:**
+    ```json
+    {
+      "allowed": true,
+      "customer_id": "cus_123",
+      "feature_id": "ai_tokens",
+      "type": "usage",
+      "breakdown": [
+        {
+          "interval": "month",
+          "balance": 1000,
+          "usage": 250
+        }
+      ]
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Step 1: Update API Version Header
+
+Add or update the version header in your requests:
+
+<CodeGroup>
+
+```typescript TypeScript
+// Before (v1.1)
+const response = await fetch('https://api.useautumn.com/v1/customers/cus_123', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`
+  }
+});
+
+// After (v1.2)
+const response = await fetch('https://api.useautumn.com/v1/customers/cus_123', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Autumn-Version': '1.2'  // Add this header
+  }
+});
+```
+
+```python Python
+# Before (v1.1)
+headers = {
+    'Authorization': f'Bearer {api_key}'
+}
+
+# After (v1.2)
+headers = {
+    'Authorization': f'Bearer {api_key}',
+    'Autumn-Version': '1.2'  # Add this header
+}
+```
+
+</CodeGroup>
+
+### Step 2: Update Feature Access Code
+
+Update how you access feature data:
+
+<CodeGroup>
+
+```typescript TypeScript
+// Before (v1.1) - Array access
+const customer = await getCustomer('cus_123');
+const aiTokenFeature = customer.features.find(
+  f => f.feature_id === 'ai_tokens'
+);
+const balance = aiTokenFeature?.balance || 0;
+
+// After (v1.2) - Object access with breakdown
+const customer = await getCustomer('cus_123');
+const aiTokenFeature = customer.features['ai_tokens'];
+const balance = aiTokenFeature?.breakdown?.[0]?.balance || 0;
+
+// Or iterate through breakdown for multi-interval features
+if (aiTokenFeature?.breakdown) {
+  for (const period of aiTokenFeature.breakdown) {
+    console.log(`${period.interval}: ${period.balance} remaining`);
+  }
+}
+```
+
+```python Python
+# Before (v1.1) - Array access
+customer = get_customer('cus_123')
+ai_token_feature = next(
+    (f for f in customer['features'] if f['feature_id'] == 'ai_tokens'),
+    None
+)
+balance = ai_token_feature.get('balance', 0) if ai_token_feature else 0
+
+# After (v1.2) - Object access with breakdown
+customer = get_customer('cus_123')
+ai_token_feature = customer['features'].get('ai_tokens')
+breakdown = ai_token_feature.get('breakdown', [])
+balance = breakdown[0].get('balance', 0) if breakdown else 0
+
+# Or iterate through breakdown
+if ai_token_feature and 'breakdown' in ai_token_feature:
+    for period in ai_token_feature['breakdown']:
+        print(f"{period['interval']}: {period['balance']} remaining")
+```
+
+</CodeGroup>
+
+### Step 3: Update CheckResult Handling
+
+Update how you handle check endpoint responses:
+
+<CodeGroup>
+
+```typescript TypeScript
+// Before (v1.1)
+const checkResult = await check({ featureId: 'ai_tokens' });
+if (!checkResult.allowed) {
+  alert(`Insufficient balance: ${checkResult.balance}`);
+}
+
+// After (v1.2)
+const checkResult = await check({ featureId: 'ai_tokens' });
+if (!checkResult.allowed) {
+  const balance = checkResult.breakdown?.[0]?.balance || 0;
+  alert(`Insufficient balance: ${balance}`);
+}
+```
+
+```python Python
+# Before (v1.1)
+check_result = check(feature_id='ai_tokens')
+if not check_result['allowed']:
+    print(f"Insufficient balance: {check_result['balance']}")
+
+# After (v1.2)
+check_result = check(feature_id='ai_tokens')
+if not check_result['allowed']:
+    breakdown = check_result.get('breakdown', [])
+    balance = breakdown[0].get('balance', 0) if breakdown else 0
+    print(f"Insufficient balance: {balance}")
+```
+
+</CodeGroup>
+
+### Step 4: Test Thoroughly
+
+<Steps>
+  <Step title="Test in Development">
+    Update your test environment first and verify all feature access works correctly.
+  </Step>
+  
+  <Step title="Check Multi-Interval Features">
+    If you use features with multiple intervals, test the breakdown array handling.
+  </Step>
+  
+  <Step title="Validate Edge Cases">
+    Test features without breakdown, unlimited features, and static features.
+  </Step>
+  
+  <Step title="Deploy to Production">
+    After thorough testing, deploy to production with the updated version header.
+  </Step>
+</Steps>
+
+### Benefits of Upgrading
+
+<CardGroup cols={2}>
+  <Card title="Better Multi-Interval Support" icon="calendar">
+    Access all interval periods for a feature in a single response.
+  </Card>
+  
+  <Card title="Cleaner Data Structure" icon="diagram-project">
+    Features are keyed by ID for O(1) lookup instead of array searching.
+  </Card>
+  
+  <Card title="More Detailed Information" icon="info">
+    Get additional fields like `rollovers` and `usage_limit` per interval.
+  </Card>
+  
+  <Card title="Type Safety" icon="shield">
+    Better TypeScript support with strongly typed feature objects.
+  </Card>
+</CardGroup>
+
+---
+
+## Migrating from v1.0 to v1.2
+
+If you're on v1.0, we recommend migrating directly to v1.2 to get all the latest features.
+
+### Step 1: Review v1.0 → v1.1 Changes
+
+First, understand the changes introduced in v1.1:
+
+- Enhanced customer object structure
+- Improved entity handling
+- Better error responses
+
+### Step 2: Follow v1.1 → v1.2 Migration
+
+Then follow the [v1.1 → v1.2 migration steps](#migrating-from-v11-to-v12) above.
+
+### Step 3: Update All Endpoints
+
+Ensure you update the version header for all API calls:
+- Customer endpoints
+- Check/entitled endpoints
+- Track endpoints
+- Product/feature endpoints
+
+---
+
+## Rollback Strategy
+
+If you need to roll back after upgrading:
+
+<Steps>
+  <Step title="Remove Version Header">
+    Remove the `Autumn-Version` header to use your previous version.
+  </Step>
+  
+  <Step title="Revert Code Changes">
+    Revert your code to the previous feature access patterns.
+  </Step>
+  
+  <Step title="Test Functionality">
+    Verify all functionality works with the old version.
+  </Step>
+</Steps>
+
+<Warning>
+  Rolling back doesn't require any server-side changes. Your code will automatically receive responses in the older format.
+</Warning>
+
+---
+
+## Testing Your Migration
+
+Use these test cases to verify your migration:
+
+### Test Case 1: Feature Access
+
+```typescript
+// Test that you can access features correctly
+const customer = await getCustomer('test_customer');
+const feature = customer.features['test_feature'];
+assert(feature !== undefined);
+assert(feature.breakdown.length > 0);
+```
+
+### Test Case 2: Check Endpoint
+
+```typescript
+// Test check endpoint response parsing
+const result = await check({ featureId: 'test_feature' });
+assert(result.allowed !== undefined);
+assert(result.breakdown !== undefined);
+```
+
+### Test Case 3: Multi-Interval Features
+
+```typescript
+// Test features with multiple intervals
+const customer = await getCustomer('test_customer');
+const feature = customer.features['multi_interval_feature'];
+assert(feature.breakdown.length > 1);
+for (const period of feature.breakdown) {
+  assert(period.interval !== undefined);
+  assert(period.balance !== undefined);
+}
+```
+
+---
+
+## Getting Help
+
+If you encounter issues during migration:
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/STqxY92zuS">
+    Get help from the community and Autumn team
+  </Card>
+  
+  <Card title="Email Support" icon="envelope" href="mailto:hey@useautumn.com">
+    Contact hey@useautumn.com for migration support
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Review the complete API documentation
+  </Card>
+  
+  <Card title="Changelog" icon="clock-rotate-left" href="/resources/changelog">
+    See detailed version change notes
+  </Card>
+</CardGroup>
+
+---
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="API Versioning" icon="code-branch" href="/resources/versioning">
+    Learn about version management
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/resources/errors">
+    Handle errors during migration
+  </Card>
+</CardGroup>

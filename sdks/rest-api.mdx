@@ -1,0 +1,619 @@
+---
+title: "REST API"
+description: "Direct HTTP access to Autumn's billing API for any language or platform"
+---
+
+## Base URL
+
+All API requests should be made to:
+
+```
+https://api.useautumn.com/v1
+```
+
+For self-hosted instances, replace with your instance URL:
+
+```
+https://your-autumn-instance.com/v1
+```
+
+## Authentication
+
+Authenticate requests using your secret key in the `Authorization` header:
+
+```bash
+Authorization: Bearer am_sk_...
+```
+
+<Warning>
+  Never expose your secret key in client-side code. Always make API calls from your backend.
+</Warning>
+
+### Getting Your API Key
+
+1. Log into the [Autumn Dashboard](https://app.useautumn.com)
+2. Navigate to **Settings** → **API Keys**
+3. Generate a new secret key
+4. Store it securely as an environment variable
+
+## Request Format
+
+All POST requests should include:
+
+- `Content-Type: application/json` header
+- JSON-encoded request body
+- `Authorization` header with your secret key
+
+```bash
+curl https://api.useautumn.com/v1/check \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "user_123", "feature_id": "api_calls"}'
+```
+
+## Response Format
+
+Successful responses return JSON with a `data` object:
+
+```json
+{
+  "data": {
+    "allowed": true,
+    "balance": 9500,
+    "unlimited": false,
+    "featureId": "api_calls"
+  }
+}
+```
+
+Error responses include a `code` and `message`:
+
+```json
+{
+  "error": {
+    "code": "customer_not_found",
+    "message": "Customer with ID 'user_123' not found"
+  }
+}
+```
+
+## Core Operations
+
+### Attach
+
+Subscribe a customer to a product or plan.
+
+```bash
+curl -X POST https://api.useautumn.com/v1/attach \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "user_123",
+    "product_id": "pro_plan",
+    "success_url": "https://yourapp.com/success",
+    "cancel_url": "https://yourapp.com/cancel"
+  }'
+```
+
+#### Request Body
+
+<ParamField path="customer_id" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="product_id" type="string" required>
+  The ID of the product/plan to attach
+</ParamField>
+
+<ParamField path="success_url" type="string" required>
+  URL to redirect after successful checkout
+</ParamField>
+
+<ParamField path="cancel_url" type="string">
+  URL to redirect if customer cancels checkout
+</ParamField>
+
+<ParamField path="options" type="array">
+  Feature options for prepaid features:
+  ```json
+  "options": [
+    { "feature_id": "api_calls", "quantity": 1000 }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="entity_id" type="string">
+  Optional entity ID for multi-entity customers
+</ParamField>
+
+#### Response
+
+```json
+{
+  "data": {
+    "url": "https://checkout.stripe.com/c/pay/...",
+    "customerId": "user_123",
+    "productId": "pro_plan",
+    "status": "pending"
+  }
+}
+```
+
+If `url` is present, redirect the customer to complete checkout. If not, the subscription was updated immediately.
+
+### Check
+
+Verify if a customer has access to a feature.
+
+```bash
+curl -X POST https://api.useautumn.com/v1/check \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "user_123",
+    "feature_id": "api_calls"
+  }'
+```
+
+#### Request Body
+
+<ParamField path="customer_id" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="feature_id" type="string" required>
+  The ID of the feature to check access for
+</ParamField>
+
+<ParamField path="required_balance" type="number">
+  Minimum balance required (default: 1)
+</ParamField>
+
+<ParamField path="entity_id" type="string">
+  Optional entity ID for multi-entity customers
+</ParamField>
+
+<ParamField path="with_preview" type="boolean">
+  Include preview of next billing period (default: false)
+</ParamField>
+
+#### Response
+
+```json
+{
+  "data": {
+    "allowed": true,
+    "balance": 9500,
+    "unlimited": false,
+    "resetAt": "2024-03-01T00:00:00Z",
+    "featureId": "api_calls"
+  }
+}
+```
+
+<ResponseField name="allowed" type="boolean">
+  Whether the customer can use the feature
+</ResponseField>
+
+<ResponseField name="balance" type="number">
+  Remaining balance (for usage-based features)
+</ResponseField>
+
+<ResponseField name="unlimited" type="boolean">
+  Whether the feature has unlimited access
+</ResponseField>
+
+<ResponseField name="resetAt" type="string">
+  ISO 8601 timestamp when the balance resets
+</ResponseField>
+
+### Track
+
+Record usage events for metering and enforcement.
+
+```bash
+curl -X POST https://api.useautumn.com/v1/track \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "user_123",
+    "feature_id": "api_calls",
+    "value": 1
+  }'
+```
+
+#### Request Body
+
+<ParamField path="customer_id" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="feature_id" type="string" required>
+  The ID of the feature being used
+</ParamField>
+
+<ParamField path="value" type="number">
+  The amount of usage to record (default: 1)
+</ParamField>
+
+<ParamField path="entity_id" type="string">
+  Optional entity ID for multi-entity customers
+</ParamField>
+
+#### Response
+
+```json
+{
+  "data": {
+    "success": true,
+    "balance": 9499,
+    "used": 501,
+    "limit": 10000
+  }
+}
+```
+
+## Customer Management
+
+### Create Customer
+
+```bash
+curl -X POST https://api.useautumn.com/v1/customers/create \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "user_123",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }'
+```
+
+### Get Customer
+
+```bash
+curl https://api.useautumn.com/v1/customers/user_123 \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY"
+```
+
+### Update Customer
+
+```bash
+curl -X PUT https://api.useautumn.com/v1/customers/user_123 \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newemail@example.com",
+    "name": "Jane Doe"
+  }'
+```
+
+### List Customers
+
+```bash
+curl "https://api.useautumn.com/v1/customers/list?limit=10&offset=0" \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY"
+```
+
+## Product Operations
+
+### List Products
+
+Get products with billing scenarios for a customer:
+
+```bash
+curl "https://api.useautumn.com/v1/products/list?customer_id=user_123" \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "list": [
+      {
+        "id": "free_plan",
+        "name": "Free",
+        "description": "Free plan",
+        "scenario": "active",
+        "price": 0
+      },
+      {
+        "id": "pro_plan",
+        "name": "Pro",
+        "description": "Pro features",
+        "scenario": "upgrade",
+        "price": 29
+      },
+      {
+        "id": "enterprise_plan",
+        "name": "Enterprise",
+        "description": "Enterprise features",
+        "scenario": "upgrade",
+        "price": 99
+      }
+    ]
+  }
+}
+```
+
+The `scenario` field indicates the relationship to the customer's current plan:
+- `active` - Customer's current plan
+- `upgrade` - Higher tier than current plan
+- `downgrade` - Lower tier than current plan
+- `scheduled` - Scheduled for future activation
+
+### Get Product
+
+```bash
+curl https://api.useautumn.com/v1/products/pro_plan \
+  -H "Authorization: Bearer $AUTUMN_SECRET_KEY"
+```
+
+## Error Handling
+
+Autumn uses standard HTTP status codes:
+
+| Status Code | Meaning |
+|------------|--------|
+| 200 | Success |
+| 400 | Bad Request - Invalid parameters |
+| 401 | Unauthorized - Invalid or missing API key |
+| 404 | Not Found - Resource doesn't exist |
+| 429 | Too Many Requests - Rate limit exceeded |
+| 500 | Internal Server Error |
+
+### Common Error Codes
+
+| Code | Description |
+|------|-------------|
+| `customer_not_found` | Customer doesn't exist |
+| `product_not_found` | Product doesn't exist |
+| `feature_not_found` | Feature doesn't exist |
+| `invalid_request` | Invalid request parameters |
+| `unauthorized` | Invalid or missing API key |
+| `rate_limit_exceeded` | Too many requests |
+
+### Error Response Example
+
+```json
+{
+  "error": {
+    "code": "customer_not_found",
+    "message": "Customer with ID 'user_123' not found",
+    "statusCode": 404
+  }
+}
+```
+
+## Rate Limits
+
+The API enforces rate limits to ensure fair usage:
+
+- **Default**: 1000 requests per minute per API key
+- **Burst**: Up to 100 requests per second
+
+Rate limit information is included in response headers:
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1614556800
+```
+
+When rate limited, you'll receive a `429` status code:
+
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Try again in 60 seconds.",
+    "retryAfter": 60
+  }
+}
+```
+
+## Language Examples
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import requests
+    import os
+
+    API_KEY = os.environ["AUTUMN_SECRET_KEY"]
+    BASE_URL = "https://api.useautumn.com/v1"
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # Check feature access
+    response = requests.post(
+        f"{BASE_URL}/check",
+        headers=headers,
+        json={
+            "customer_id": "user_123",
+            "feature_id": "api_calls"
+        }
+    )
+
+    data = response.json()["data"]
+    if data["allowed"]:
+        print(f"Remaining balance: {data['balance']}")
+    else:
+        print("Feature limit reached")
+
+    # Track usage
+    requests.post(
+        f"{BASE_URL}/track",
+        headers=headers,
+        json={
+            "customer_id": "user_123",
+            "feature_id": "api_calls",
+            "value": 1
+        }
+    )
+    ```
+  </Tab>
+
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "net/http"
+        "os"
+    )
+
+    const baseURL = "https://api.useautumn.com/v1"
+
+    func main() {
+        apiKey := os.Getenv("AUTUMN_SECRET_KEY")
+
+        // Check feature access
+        checkBody := map[string]string{
+            "customer_id": "user_123",
+            "feature_id": "api_calls",
+        }
+        checkJSON, _ := json.Marshal(checkBody)
+
+        req, _ := http.NewRequest(
+            "POST",
+            baseURL+"/check",
+            bytes.NewBuffer(checkJSON),
+        )
+        req.Header.Set("Authorization", "Bearer "+apiKey)
+        req.Header.Set("Content-Type", "application/json")
+
+        client := &http.Client{}
+        resp, _ := client.Do(req)
+        defer resp.Body.Close()
+
+        var result map[string]interface{}
+        json.NewDecoder(resp.Body).Decode(&result)
+
+        data := result["data"].(map[string]interface{})
+        if data["allowed"].(bool) {
+            fmt.Printf("Remaining: %.0f\n", data["balance"])
+        } else {
+            fmt.Println("Feature limit reached")
+        }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Ruby">
+    ```ruby
+    require 'net/http'
+    require 'json'
+
+    API_KEY = ENV['AUTUMN_SECRET_KEY']
+    BASE_URL = 'https://api.useautumn.com/v1'
+
+    def autumn_request(path, body)
+      uri = URI("#{BASE_URL}#{path}")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Post.new(uri.path)
+      request['Authorization'] = "Bearer #{API_KEY}"
+      request['Content-Type'] = 'application/json'
+      request.body = body.to_json
+
+      response = http.request(request)
+      JSON.parse(response.body)
+    end
+
+    # Check feature access
+    result = autumn_request('/check', {
+      customer_id: 'user_123',
+      feature_id: 'api_calls'
+    })
+
+    if result['data']['allowed']
+      puts "Remaining: #{result['data']['balance']}"
+    else
+      puts 'Feature limit reached'
+    end
+
+    # Track usage
+    autumn_request('/track', {
+      customer_id: 'user_123',
+      feature_id: 'api_calls',
+      value: 1
+    })
+    ```
+  </Tab>
+
+  <Tab title="PHP">
+    ```php
+    <?php
+
+    $apiKey = getenv('AUTUMN_SECRET_KEY');
+    $baseUrl = 'https://api.useautumn.com/v1';
+
+    function autumnRequest($path, $body) {
+        global $apiKey, $baseUrl;
+        
+        $ch = curl_init($baseUrl . $path);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $apiKey,
+            'Content-Type: application/json'
+        ]);
+        
+        $response = curl_exec($ch);
+        curl_close($ch);
+        
+        return json_decode($response, true);
+    }
+
+    // Check feature access
+    $result = autumnRequest('/check', [
+        'customer_id' => 'user_123',
+        'feature_id' => 'api_calls'
+    ]);
+
+    if ($result['data']['allowed']) {
+        echo "Remaining: " . $result['data']['balance'] . "\n";
+    } else {
+        echo "Feature limit reached\n";
+    }
+
+    // Track usage
+    autumnRequest('/track', [
+        'customer_id' => 'user_123',
+        'feature_id' => 'api_calls',
+        'value' => 1
+    ]);
+    ```
+  </Tab>
+</Tabs>
+
+## Webhooks
+
+Autumn sends webhooks for important events like subscription changes and payment failures. See the [Webhooks guide](/concepts/webhooks) for setup instructions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api/core/attach">
+    Explore the complete API documentation
+  </Card>
+  <Card title="JavaScript SDK" icon="js" href="/sdks/javascript">
+    Use the JavaScript SDK for easier integration
+  </Card>
+  <Card title="Authentication" icon="key" href="/resources/authentication">
+    Learn more about API keys and security
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/resources/rate-limits">
+    Understand rate limiting policies
+  </Card>
+</CardGroup>

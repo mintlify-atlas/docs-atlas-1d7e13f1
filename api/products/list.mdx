@@ -1,0 +1,323 @@
+---
+title: 'List Products'
+openapi: 'GET /plans'
+---
+
+Retrieves a list of all products (plans) in your Autumn environment. You can optionally filter by customer to see only products available to that customer.
+
+## Query Parameters
+
+<ParamField query="customer_id" type="string">
+  Filter products by customer eligibility. Returns only products available to this customer, including eligibility information.
+  
+  ```
+  cus_1234567890
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="list" type="array">
+  Array of product objects.
+  
+  <ResponseField name="list[].id" type="string">
+    Unique identifier for the product.
+  </ResponseField>
+  
+  <ResponseField name="list[].name" type="string">
+    Display name of the product.
+  </ResponseField>
+  
+  <ResponseField name="list[].description" type="string | null">
+    Description of the product.
+  </ResponseField>
+  
+  <ResponseField name="list[].group" type="string | null">
+    Product group identifier for organizing related products.
+  </ResponseField>
+  
+  <ResponseField name="list[].version" type="number">
+    Version number of the product.
+  </ResponseField>
+  
+  <ResponseField name="list[].add_on" type="boolean">
+    Whether this product is an add-on.
+  </ResponseField>
+  
+  <ResponseField name="list[].default" type="boolean">
+    Whether this is the default product for new customers.
+  </ResponseField>
+  
+  <ResponseField name="list[].price" type="object | null">
+    Base price configuration.
+    
+    <ResponseField name="list[].price.amount" type="number">
+      Price amount in cents.
+    </ResponseField>
+    
+    <ResponseField name="list[].price.interval" type="string">
+      Billing interval. One of: `one_off`, `week`, `month`, `quarter`, `semi_annual`, `year`.
+    </ResponseField>
+    
+    <ResponseField name="list[].price.interval_count" type="number">
+      Number of intervals between billings.
+    </ResponseField>
+    
+    <ResponseField name="list[].price.display" type="object">
+      Display configuration for the price.
+      
+      <ResponseField name="list[].price.display.primary_text" type="string">
+        Primary display text.
+      </ResponseField>
+      
+      <ResponseField name="list[].price.display.secondary_text" type="string">
+        Secondary display text.
+      </ResponseField>
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="list[].features" type="array">
+    Array of features included in the product.
+    
+    <ResponseField name="list[].features[].feature_id" type="string">
+      ID of the feature.
+    </ResponseField>
+    
+    <ResponseField name="list[].features[].included" type="number">
+      Amount of the feature included.
+    </ResponseField>
+    
+    <ResponseField name="list[].features[].unlimited" type="boolean">
+      Whether the feature has unlimited usage.
+    </ResponseField>
+    
+    <ResponseField name="list[].features[].reset" type="object | null">
+      Reset configuration for usage limits.
+    </ResponseField>
+    
+    <ResponseField name="list[].features[].price" type="object | null">
+      Pricing configuration for this feature.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="list[].free_trial" type="object | null">
+    Free trial configuration if enabled.
+    
+    <ResponseField name="list[].free_trial.duration_length" type="number">
+      Length of the free trial period.
+    </ResponseField>
+    
+    <ResponseField name="list[].free_trial.duration_type" type="string">
+      Unit of time for the trial. One of: `day`, `month`, `year`.
+    </ResponseField>
+    
+    <ResponseField name="list[].free_trial.card_required" type="boolean">
+      Whether a credit card is required to start the trial.
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="list[].created_at" type="number">
+    Unix timestamp when the product was created.
+  </ResponseField>
+  
+  <ResponseField name="list[].env" type="string">
+    Environment the product belongs to (e.g., `production`, `development`).
+  </ResponseField>
+  
+  <ResponseField name="list[].archived" type="boolean">
+    Whether the product is archived. Archived products are hidden from customers.
+  </ResponseField>
+  
+  <ResponseField name="list[].base_variant_id" type="string | null">
+    ID of the base variant if this is a product variant.
+  </ResponseField>
+  
+  <ResponseField name="list[].customer_eligibility" type="object">
+    Customer eligibility information (only present when filtering by `customer_id`).
+    
+    <ResponseField name="list[].customer_eligibility.trial_available" type="boolean">
+      Whether the free trial is available for this customer.
+    </ResponseField>
+    
+    <ResponseField name="list[].customer_eligibility.scenario" type="string">
+      Attachment scenario indicating how this product can be attached to the customer.
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+## Example Response
+
+### Without customer filter
+
+```json
+{
+  "list": [
+    {
+      "id": "free-plan",
+      "name": "Free Plan",
+      "description": "Basic features for getting started",
+      "group": "subscription-plans",
+      "version": 1,
+      "add_on": false,
+      "default": true,
+      "price": null,
+      "features": [
+        {
+          "feature_id": "api-calls",
+          "included": 1000,
+          "unlimited": false,
+          "reset": {
+            "interval": "month",
+            "interval_count": 1
+          },
+          "price": null
+        }
+      ],
+      "free_trial": null,
+      "created_at": 1708272000,
+      "env": "production",
+      "archived": false,
+      "base_variant_id": null
+    },
+    {
+      "id": "premium-plan",
+      "name": "Premium Plan",
+      "description": "Full access to all premium features",
+      "group": "subscription-plans",
+      "version": 1,
+      "add_on": false,
+      "default": false,
+      "price": {
+        "amount": 2999,
+        "interval": "month",
+        "interval_count": 1,
+        "display": {
+          "primary_text": "$29.99/month",
+          "secondary_text": "Billed monthly"
+        }
+      },
+      "features": [
+        {
+          "feature_id": "api-calls",
+          "included": 10000,
+          "unlimited": false,
+          "reset": {
+            "interval": "month",
+            "interval_count": 1
+          },
+          "price": {
+            "amount": 10,
+            "interval": "month",
+            "interval_count": 1,
+            "billing_units": 1000,
+            "billing_method": "usage_based",
+            "max_purchase": null
+          }
+        }
+      ],
+      "free_trial": {
+        "duration_length": 14,
+        "duration_type": "day",
+        "card_required": true
+      },
+      "created_at": 1708272000,
+      "env": "production",
+      "archived": false,
+      "base_variant_id": null
+    },
+    {
+      "id": "enterprise-plan",
+      "name": "Enterprise Plan",
+      "description": "Custom solutions for large organizations",
+      "group": "subscription-plans",
+      "version": 1,
+      "add_on": false,
+      "default": false,
+      "price": {
+        "amount": 99900,
+        "interval": "year",
+        "interval_count": 1
+      },
+      "features": [
+        {
+          "feature_id": "api-calls",
+          "included": 1000000,
+          "unlimited": false,
+          "reset": {
+            "interval": "year",
+            "interval_count": 1
+          },
+          "price": null
+        },
+        {
+          "feature_id": "priority-support",
+          "included": 1,
+          "unlimited": true,
+          "reset": null,
+          "price": null
+        }
+      ],
+      "free_trial": null,
+      "created_at": 1708272000,
+      "env": "production",
+      "archived": false,
+      "base_variant_id": null
+    }
+  ]
+}
+```
+
+### With customer filter
+
+```json
+{
+  "list": [
+    {
+      "id": "premium-plan",
+      "name": "Premium Plan",
+      "description": "Full access to all premium features",
+      "group": "subscription-plans",
+      "version": 1,
+      "add_on": false,
+      "default": false,
+      "price": {
+        "amount": 2999,
+        "interval": "month",
+        "interval_count": 1
+      },
+      "features": [
+        {
+          "feature_id": "api-calls",
+          "included": 10000,
+          "unlimited": false,
+          "reset": {
+            "interval": "month",
+            "interval_count": 1
+          },
+          "price": null
+        }
+      ],
+      "free_trial": {
+        "duration_length": 14,
+        "duration_type": "day",
+        "card_required": true
+      },
+      "created_at": 1708272000,
+      "env": "production",
+      "archived": false,
+      "base_variant_id": null,
+      "customer_eligibility": {
+        "trial_available": true,
+        "scenario": "upgrade"
+      }
+    }
+  ]
+}
+```
+
+## Notes
+
+- By default, archived products are excluded from the list.
+- When filtering by `customer_id`, the response includes `customer_eligibility` information for each product.
+- Products are returned in creation order.
+- Each product ID may have multiple versions, but only the latest version is returned by default.

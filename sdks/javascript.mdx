@@ -1,0 +1,545 @@
+---
+title: "JavaScript SDK"
+description: "Full-featured SDK for Node.js, Bun, and Deno server-side applications"
+---
+
+## Installation
+
+Install the Autumn SDK using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install autumn-js
+```
+
+```bash yarn
+yarn add autumn-js
+```
+
+```bash pnpm
+pnpm add autumn-js
+```
+
+```bash bun
+bun add autumn-js
+```
+</CodeGroup>
+
+## Client Initialization
+
+Create an Autumn client instance with your secret key:
+
+```typescript
+import Autumn from "autumn-js";
+
+const autumn = new Autumn({
+  secretKey: process.env.AUTUMN_SECRET_KEY,
+});
+```
+
+<Note>
+  For self-hosted instances, pass the `baseUrl` option:
+  ```typescript
+  const autumn = new Autumn({
+    secretKey: process.env.AUTUMN_SECRET_KEY,
+    baseUrl: "https://your-autumn-instance.com"
+  });
+  ```
+</Note>
+
+## Core API Methods
+
+### attach()
+
+Subscribe a customer to a product or plan. Handles new subscriptions, upgrades, and downgrades automatically.
+
+```typescript
+const result = await autumn.attach({
+  customerId: "user_123",
+  productId: "pro_plan",
+  successUrl: "https://yourapp.com/success",
+  cancelUrl: "https://yourapp.com/cancel", // optional
+});
+
+if (result.data.url) {
+  // New customer - redirect to Stripe checkout
+  response.redirect(result.data.url);
+} else {
+  // Existing customer - subscription updated
+  console.log("Subscription updated");
+}
+```
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="productId" type="string" required>
+  The ID of the product/plan to attach
+</ParamField>
+
+<ParamField path="successUrl" type="string" required>
+  URL to redirect after successful checkout
+</ParamField>
+
+<ParamField path="cancelUrl" type="string">
+  URL to redirect if customer cancels checkout
+</ParamField>
+
+<ParamField path="options" type="array">
+  Feature options for prepaid or usage-based features:
+  ```typescript
+  options: [
+    { feature_id: "api_calls", quantity: 1000 }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="entityId" type="string">
+  Optional entity ID for multi-entity customers (e.g., organization ID)
+</ParamField>
+
+#### Response
+
+```typescript
+{
+  data: {
+    url?: string;           // Stripe checkout URL (for new customers)
+    customerId: string;
+    productId: string;
+    status: string;
+  }
+}
+```
+
+### check()
+
+Verify if a customer has access to a feature before allowing usage.
+
+```typescript
+const { data } = await autumn.check({
+  customerId: "user_123",
+  featureId: "api_calls",
+});
+
+if (!data.allowed) {
+  throw new Error("Feature limit reached. Please upgrade.");
+}
+
+// Proceed with the action
+console.log(`Remaining balance: ${data.balance}`);
+```
+
+#### With Required Balance
+
+Check if customer has sufficient balance for a specific quantity:
+
+```typescript
+const { data } = await autumn.check({
+  customerId: "user_123",
+  featureId: "api_calls",
+  requiredBalance: 100, // Check for 100 API calls
+});
+
+if (data.allowed) {
+  // Customer has at least 100 API calls remaining
+}
+```
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="featureId" type="string" required>
+  The ID of the feature to check access for
+</ParamField>
+
+<ParamField path="requiredBalance" type="number">
+  Minimum balance required (default: 1)
+</ParamField>
+
+<ParamField path="entityId" type="string">
+  Optional entity ID for multi-entity customers
+</ParamField>
+
+<ParamField path="withPreview" type="boolean">
+  Include preview of next billing period (default: false)
+</ParamField>
+
+#### Response
+
+```typescript
+{
+  data: {
+    allowed: boolean;       // Whether customer can use the feature
+    balance?: number;       // Remaining balance (for usage-based features)
+    unlimited: boolean;     // Whether feature has unlimited access
+    resetAt?: string;       // When the balance resets (ISO 8601)
+    featureId: string;
+  }
+}
+```
+
+### track()
+
+Record usage events for metering and enforcement of usage-based limits.
+
+```typescript
+await autumn.track({
+  customerId: "user_123",
+  featureId: "api_calls",
+  value: 1,
+});
+```
+
+#### Bulk Tracking
+
+Track multiple units at once:
+
+```typescript
+await autumn.track({
+  customerId: "user_123",
+  featureId: "ai_tokens",
+  value: 1000, // Used 1000 tokens
+});
+```
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier for your customer
+</ParamField>
+
+<ParamField path="featureId" type="string" required>
+  The ID of the feature being used
+</ParamField>
+
+<ParamField path="value" type="number">
+  The amount of usage to record (default: 1)
+</ParamField>
+
+<ParamField path="entityId" type="string">
+  Optional entity ID for multi-entity customers
+</ParamField>
+
+#### Response
+
+```typescript
+{
+  data: {
+    success: boolean;
+    balance?: number;       // Remaining balance after tracking
+    used: number;           // Total usage for current period
+    limit?: number;         // Usage limit (if applicable)
+  }
+}
+```
+
+## Customer Management
+
+### Create Customer
+
+```typescript
+await autumn.customers.create({
+  id: "user_123",
+  email: "user@example.com",
+  name: "John Doe",
+});
+```
+
+### Get Customer
+
+```typescript
+const { data } = await autumn.customers.get({
+  customerId: "user_123",
+});
+
+console.log(data.customer.email);
+```
+
+### Update Customer
+
+```typescript
+await autumn.customers.update({
+  customerId: "user_123",
+  email: "newemail@example.com",
+  name: "Jane Doe",
+});
+```
+
+### List Customers
+
+```typescript
+const { data } = await autumn.customers.list({
+  limit: 10,
+  offset: 0,
+});
+
+for (const customer of data.list) {
+  console.log(customer.id, customer.email);
+}
+```
+
+## Product Operations
+
+### List Products
+
+Get all products with billing scenarios for a specific customer:
+
+```typescript
+const { data } = await autumn.products.list({
+  customerId: "user_123",
+});
+
+const buttonText: Record<string, string> = {
+  active: "Current Plan",
+  upgrade: "Upgrade",
+  downgrade: "Downgrade",
+  scheduled: "Scheduled",
+};
+
+for (const product of data.list) {
+  console.log(
+    `${product.name}: ${buttonText[product.scenario] ?? "Subscribe"}`
+  );
+}
+```
+
+### Get Product
+
+```typescript
+const { data } = await autumn.products.get({
+  productId: "pro_plan",
+});
+
+console.log(data.product.name, data.product.description);
+```
+
+## Checkout Flow
+
+For more control over the checkout process, use the `checkout()` method:
+
+```typescript
+const { data } = await autumn.checkout({
+  customerId: "user_123",
+  productId: "pro_plan",
+});
+
+if (data.url) {
+  // New customer → redirect to Stripe
+  return response.redirect(data.url);
+}
+
+// Returning customer → show preview
+console.log("Preview:", {
+  product: data.product,
+  total: data.total,
+  currency: data.currency,
+});
+
+// After user confirms, call attach()
+await autumn.attach({
+  customerId: "user_123",
+  productId: "pro_plan",
+});
+```
+
+## Error Handling
+
+The SDK throws errors for failed requests. Wrap API calls in try-catch blocks:
+
+```typescript
+try {
+  await autumn.attach({
+    customerId: "user_123",
+    productId: "pro_plan",
+    successUrl: "https://yourapp.com/success",
+  });
+} catch (error) {
+  if (error.code === "customer_not_found") {
+    // Create the customer first
+    await autumn.customers.create({
+      id: "user_123",
+      email: "user@example.com",
+    });
+  } else if (error.code === "product_not_found") {
+    // Handle invalid product ID
+    console.error("Invalid product ID");
+  } else {
+    // Handle other errors
+    console.error("Unexpected error:", error.message);
+  }
+}
+```
+
+### Common Error Codes
+
+- `customer_not_found` - Customer doesn't exist
+- `product_not_found` - Product doesn't exist
+- `feature_not_found` - Feature doesn't exist
+- `invalid_request` - Invalid request parameters
+- `unauthorized` - Invalid or missing API key
+- `rate_limit_exceeded` - Too many requests
+
+## TypeScript Support
+
+The SDK is written in TypeScript and includes full type definitions:
+
+```typescript
+import Autumn, { type Customer, type Product } from "autumn-js";
+
+const autumn = new Autumn({
+  secretKey: process.env.AUTUMN_SECRET_KEY!,
+});
+
+// Full type inference
+const { data } = await autumn.customers.get({
+  customerId: "user_123",
+});
+
+const customer: Customer = data.customer; // Fully typed
+```
+
+### Available Types
+
+```typescript
+import type {
+  Customer,
+  Product,
+  Feature,
+  CheckResponse,
+  TrackResponse,
+  AttachResponse,
+  CheckoutResult,
+} from "autumn-js";
+```
+
+## Real-World Examples
+
+### API Route Handler (Next.js)
+
+```typescript app/api/subscribe/route.ts
+import Autumn from "autumn-js";
+import { NextResponse } from "next/server";
+
+const autumn = new Autumn({
+  secretKey: process.env.AUTUMN_SECRET_KEY!,
+});
+
+export async function POST(request: Request) {
+  const { userId, productId } = await request.json();
+
+  try {
+    const result = await autumn.attach({
+      customerId: userId,
+      productId,
+      successUrl: `${process.env.NEXT_PUBLIC_URL}/success`,
+      cancelUrl: `${process.env.NEXT_PUBLIC_URL}/cancel`,
+    });
+
+    return NextResponse.json(result.data);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+}
+```
+
+### Feature Gate Middleware
+
+```typescript middleware/featureGate.ts
+import Autumn from "autumn-js";
+
+const autumn = new Autumn({
+  secretKey: process.env.AUTUMN_SECRET_KEY!,
+});
+
+export async function checkFeatureAccess(
+  userId: string,
+  featureId: string
+) {
+  const { data } = await autumn.check({
+    customerId: userId,
+    featureId,
+  });
+
+  if (!data.allowed) {
+    throw new Error(
+      `Access denied. Feature: ${featureId}. Please upgrade your plan.`
+    );
+  }
+
+  return data;
+}
+
+// Usage in API route
+export async function POST(req: Request) {
+  const userId = req.headers.get("x-user-id");
+  
+  await checkFeatureAccess(userId, "advanced_api");
+  
+  // Proceed with the request
+}
+```
+
+### Usage Tracking with Auto-Billing
+
+```typescript services/ai.ts
+import Autumn from "autumn-js";
+
+const autumn = new Autumn({
+  secretKey: process.env.AUTUMN_SECRET_KEY!,
+});
+
+export async function processAIRequest(
+  userId: string,
+  prompt: string
+) {
+  // Check if user has tokens
+  const { data } = await autumn.check({
+    customerId: userId,
+    featureId: "ai_tokens",
+    requiredBalance: 1000, // Estimate
+  });
+
+  if (!data.allowed) {
+    throw new Error("Insufficient AI tokens. Please purchase more.");
+  }
+
+  // Process AI request
+  const response = await callAIService(prompt);
+  const tokensUsed = response.usage.total_tokens;
+
+  // Track actual usage
+  await autumn.track({
+    customerId: userId,
+    featureId: "ai_tokens",
+    value: tokensUsed,
+  });
+
+  return response;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="React SDK" icon="react" href="/sdks/react">
+    Learn about React hooks and components
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/core/attach">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/resources/errors">
+    Learn about error codes and handling
+  </Card>
+  <Card title="TypeScript Guide" icon="code" href="/guides/typescript">
+    Advanced TypeScript patterns
+  </Card>
+</CardGroup>

@@ -1,0 +1,145 @@
+---
+title: 'Get Entity'
+openapi: 'GET /customers/{customer_id}/entities/{entity_id}'
+---
+
+Retrieve details about a specific entity.
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The ID of the customer
+</ParamField>
+
+<ParamField path="entity_id" type="string" required>
+  The ID of the entity to retrieve
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="expand" type="array">
+  Comma-separated list of fields to expand in the response:
+  
+  - `invoices` - Include invoices for this entity
+  - `subscriptions.plan` - Expand plan details in subscriptions
+  - `purchases.plan` - Expand plan details in purchases
+  - `balances.feature` - Expand feature details in balances
+</ParamField>
+
+<ParamField query="skip_cache" type="boolean">
+  Skip cache and fetch fresh data
+</ParamField>
+
+<ParamField query="with_autumn_id" type="boolean">
+  Include Autumn internal ID in response
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  The ID of the entity
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The name of the entity
+</ResponseField>
+
+<ResponseField name="customer_id" type="string">
+  The parent customer ID
+</ResponseField>
+
+<ResponseField name="feature_id" type="string">
+  The associated feature ID
+</ResponseField>
+
+<ResponseField name="customer_data" type="object">
+  Custom customer data
+</ResponseField>
+
+<ResponseField name="subscriptions" type="array">
+  Plans associated with this entity
+</ResponseField>
+
+<ResponseField name="scheduled_subscriptions" type="array">
+  Scheduled future subscriptions
+</ResponseField>
+
+<ResponseField name="balances" type="object">
+  Features and balances associated with this entity. Keys are feature IDs.
+  
+  <Expandable title="Balance Object">
+    <ResponseField name="object" type="string">
+      Always "balance"
+    </ResponseField>
+    
+    <ResponseField name="feature_id" type="string">
+      The feature ID
+    </ResponseField>
+    
+    <ResponseField name="granted" type="number">
+      Total granted balance (included + prepaid)
+    </ResponseField>
+    
+    <ResponseField name="remaining" type="number">
+      Remaining balance (minimum 0)
+    </ResponseField>
+    
+    <ResponseField name="usage" type="number">
+      Current usage
+    </ResponseField>
+    
+    <ResponseField name="unlimited" type="boolean">
+      Whether the balance is unlimited
+    </ResponseField>
+    
+    <ResponseField name="overage_allowed" type="boolean">
+      Whether overage is allowed
+    </ResponseField>
+    
+    <ResponseField name="max_purchase" type="number">
+      Maximum purchase amount
+    </ResponseField>
+    
+    <ResponseField name="next_reset_at" type="number">
+      Unix timestamp (milliseconds) of next reset
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="invoices" type="array">
+  Invoices for this entity (only when expanded)
+</ResponseField>
+
+## Example
+
+```bash Request
+curl -X GET "https://api.useautumn.com/v1/customers/cus_123/entities/workspace_1?expand=balances.feature" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```json Response
+{
+  "id": "workspace_1",
+  "name": "Production Workspace",
+  "customer_id": "cus_123",
+  "feature_id": "workspaces",
+  "customer_data": {
+    "region": "us-east-1"
+  },
+  "subscriptions": [],
+  "scheduled_subscriptions": [],
+  "balances": {
+    "api_calls": {
+      "object": "balance",
+      "feature_id": "api_calls",
+      "granted": 1000,
+      "remaining": 750,
+      "usage": 250,
+      "unlimited": false,
+      "overage_allowed": false,
+      "max_purchase": null,
+      "next_reset_at": 1709251200000
+    }
+  }
+}
+```

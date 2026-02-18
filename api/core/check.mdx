@@ -1,0 +1,467 @@
+---
+title: 'Check Feature Access'
+openapi: 'POST /check'
+---
+
+# Check Feature Access
+
+Check whether a customer has access to a feature and retrieve their current balance information.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header:
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  ID which you provided when creating the customer
+  
+  **Example:** `cus_123`
+</ParamField>
+
+<ParamField body="feature_id" type="string" required>
+  ID of the feature to check access to
+  
+  **Example:** `api_calls`
+</ParamField>
+
+<ParamField body="entity_id" type="string">
+  If using entity balances (eg, seats), the entity ID to check access for
+  
+  **Example:** `entity_456`
+</ParamField>
+
+<ParamField body="customer_data" type="object">
+  Properties used if customer is automatically created. Will also update if the name or email is not already set.
+  
+  <ParamField body="customer_data.name" type="string">
+    Customer's name
+  </ParamField>
+  
+  <ParamField body="customer_data.email" type="string">
+    Customer's email address
+  </ParamField>
+  
+  <ParamField body="customer_data.fingerprint" type="string">
+    Unique identifier to detect duplicate customers
+  </ParamField>
+  
+  <ParamField body="customer_data.metadata" type="object">
+    Additional metadata for the customer
+  </ParamField>
+</ParamField>
+
+<ParamField body="required_balance" type="number">
+  If you know the amount of the feature the end user is consuming in advance. If their balance is below this quantity, `allowed` will be false.
+  
+  **Example:** `5`
+</ParamField>
+
+<ParamField body="send_event" type="boolean">
+  If true, a usage event will be recorded together with checking access. The `required_balance` field will be used as the usage value.
+  
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="with_preview" type="boolean">
+  If true, the response will include a preview object, which can be used to display information such as a paywall or upgrade confirmation.
+  
+  **Default:** `false`
+</ParamField>
+
+## Response
+
+<ResponseField name="allowed" type="boolean" required>
+  Whether the customer has access to the feature
+</ResponseField>
+
+<ResponseField name="customer_id" type="string" required>
+  The ID of the customer
+</ResponseField>
+
+<ResponseField name="entity_id" type="string">
+  The ID of the entity (if provided in the request)
+</ResponseField>
+
+<ResponseField name="required_balance" type="number">
+  The required balance amount (if provided in the request)
+</ResponseField>
+
+<ResponseField name="balance" type="object">
+  Balance information for the feature
+  
+  <ResponseField name="balance.feature_id" type="string">
+    The feature ID
+  </ResponseField>
+  
+  <ResponseField name="balance.unlimited" type="boolean">
+    Whether the customer has unlimited access to this feature
+  </ResponseField>
+  
+  <ResponseField name="balance.granted_balance" type="number">
+    The balance granted by the customer's plan
+  </ResponseField>
+  
+  <ResponseField name="balance.purchased_balance" type="number">
+    Additional balance purchased beyond the plan
+  </ResponseField>
+  
+  <ResponseField name="balance.current_balance" type="number">
+    Current remaining balance available
+  </ResponseField>
+  
+  <ResponseField name="balance.usage" type="number">
+    Total usage consumed in the current period
+  </ResponseField>
+  
+  <ResponseField name="balance.overage_allowed" type="boolean">
+    Whether overage usage is allowed
+  </ResponseField>
+  
+  <ResponseField name="balance.max_purchase" type="number">
+    Maximum additional balance that can be purchased (null if unlimited)
+  </ResponseField>
+  
+  <ResponseField name="balance.reset" type="object">
+    Reset schedule information
+    
+    <ResponseField name="balance.reset.interval" type="string">
+      Reset interval (e.g., "month", "day", "year")
+    </ResponseField>
+    
+    <ResponseField name="balance.reset.interval_count" type="number">
+      Number of intervals between resets
+    </ResponseField>
+    
+    <ResponseField name="balance.reset.resets_at" type="number">
+      Unix timestamp when the balance will next reset (null if no reset scheduled)
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="balance.plan_id" type="string">
+    The ID of the plan providing this balance
+  </ResponseField>
+  
+  <ResponseField name="balance.feature" type="object">
+    Expanded feature object (if requested with expand parameter)
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="preview" type="object">
+  Preview information for displaying paywalls or upgrade prompts (only included when `with_preview` is true)
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.useautumn.com/check \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cus_123",
+    "feature_id": "api_calls"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.useautumn.com/check', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+```typescript TypeScript
+interface CheckRequest {
+  customer_id: string;
+  feature_id: string;
+  entity_id?: string;
+  required_balance?: number;
+  send_event?: boolean;
+  with_preview?: boolean;
+  customer_data?: {
+    name?: string;
+    email?: string;
+  };
+}
+
+interface CheckResponse {
+  allowed: boolean;
+  customer_id: string;
+  entity_id?: string;
+  required_balance?: number;
+  balance: {
+    feature_id: string;
+    unlimited: boolean;
+    granted_balance: number;
+    purchased_balance: number;
+    current_balance: number;
+    usage: number;
+    overage_allowed: boolean;
+    max_purchase: number | null;
+    reset: {
+      interval: string;
+      interval_count?: number;
+      resets_at: number | null;
+    } | null;
+    plan_id: string | null;
+  } | null;
+}
+
+const response = await fetch('https://api.useautumn.com/check', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    required_balance: 1
+  } as CheckRequest)
+});
+
+const data: CheckResponse = await response.json();
+
+if (data.allowed) {
+  console.log('Access granted');
+  console.log(`Remaining balance: ${data.balance?.current_balance}`);
+} else {
+  console.log('Access denied - insufficient balance');
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.useautumn.com/check',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={
+        'customer_id': 'cus_123',
+        'feature_id': 'api_calls'
+    }
+)
+
+data = response.json()
+print(f"Access allowed: {data['allowed']}")
+if data['balance']:
+    print(f"Current balance: {data['balance']['current_balance']}")
+```
+
+</CodeGroup>
+
+## Example Response
+
+### Successful Check with Balance
+
+```json
+{
+  "allowed": true,
+  "customer_id": "cus_123",
+  "balance": {
+    "feature_id": "api_calls",
+    "unlimited": false,
+    "granted_balance": 1000,
+    "purchased_balance": 0,
+    "current_balance": 750,
+    "usage": 250,
+    "overage_allowed": false,
+    "max_purchase": null,
+    "reset": {
+      "interval": "month",
+      "interval_count": 1,
+      "resets_at": 1704067200000
+    },
+    "plan_id": "pro_plan"
+  }
+}
+```
+
+### Check with Insufficient Balance
+
+```json
+{
+  "allowed": false,
+  "customer_id": "cus_123",
+  "required_balance": 100,
+  "balance": {
+    "feature_id": "api_calls",
+    "unlimited": false,
+    "granted_balance": 1000,
+    "purchased_balance": 0,
+    "current_balance": 50,
+    "usage": 950,
+    "overage_allowed": false,
+    "max_purchase": null,
+    "reset": {
+      "interval": "month",
+      "interval_count": 1,
+      "resets_at": 1704067200000
+    },
+    "plan_id": "pro_plan"
+  }
+}
+```
+
+### Unlimited Access
+
+```json
+{
+  "allowed": true,
+  "customer_id": "cus_123",
+  "balance": {
+    "feature_id": "api_calls",
+    "unlimited": true,
+    "granted_balance": 0,
+    "purchased_balance": 0,
+    "current_balance": 0,
+    "usage": 1250,
+    "overage_allowed": false,
+    "max_purchase": null,
+    "reset": null,
+    "plan_id": "enterprise_plan"
+  }
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Must provide either product_id or feature_id"
+  }
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer not found"
+  }
+}
+```
+
+## Use Cases
+
+### Gating Feature Access
+
+Check if a customer can use a feature before allowing the action:
+
+```typescript
+const checkAccess = async (customerId: string, featureId: string) => {
+  const response = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: featureId,
+      required_balance: 1
+    })
+  });
+  
+  const data = await response.json();
+  return data.allowed;
+};
+
+// Use in your application
+if (await checkAccess('cus_123', 'api_calls')) {
+  // Allow API call
+} else {
+  // Show upgrade prompt
+}
+```
+
+### Checking and Recording Usage Atomically
+
+Use `send_event: true` to check access and record usage in a single request:
+
+```javascript
+const response = await fetch('https://api.useautumn.com/check', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    required_balance: 1,
+    send_event: true  // Records usage if allowed
+  })
+});
+```
+
+### Displaying Balance Information
+
+Show users their remaining balance:
+
+```javascript
+const response = await fetch('https://api.useautumn.com/check', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls'
+  })
+});
+
+const data = await response.json();
+if (data.balance) {
+  console.log(`You have ${data.balance.current_balance} API calls remaining`);
+  if (data.balance.reset?.resets_at) {
+    const resetDate = new Date(data.balance.reset.resets_at);
+    console.log(`Resets on ${resetDate.toLocaleDateString()}`);
+  }
+}
+```
+
+## Notes
+
+- The `allowed` field will be `true` if the customer has unlimited access or sufficient balance
+- If `required_balance` is not provided, the check only verifies that the customer has some access to the feature
+- When `send_event` is true, usage is only recorded if access is allowed
+- The balance object will be `null` if the customer has no access to the feature
+- Use `with_preview: true` to get additional information for building upgrade prompts or paywalls

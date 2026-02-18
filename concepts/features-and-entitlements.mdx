@@ -1,0 +1,492 @@
+---
+title: "Features & Entitlements"
+description: "Understanding features, entitlements, and usage limits in Autumn"
+---
+
+## Overview
+
+**Features** define what customers can access in your application, while **entitlements** represent the actual access granted to specific customers. Together, they form the foundation of usage-based billing and access control in Autumn.
+
+## Features
+
+### What is a Feature?
+
+A feature is a capability or resource in your application that you want to meter, limit, or gate:
+
+```typescript
+// From featureTable.ts
+feature: {
+  id: string;               // Unique identifier (e.g., "api-calls")
+  name: string;             // Display name (e.g., "API Calls")
+  type: string;             // Feature type
+  internal_id: string;      // Internal ID
+  org_id: string;
+  env: "test" | "live";
+  archived: boolean;
+  event_names: string[];    // Events that trigger this feature
+  display: {                // Display configuration
+    singular: string;       // e.g., "API Call"
+    plural: string;         // e.g., "API Calls"
+  }
+}
+```
+
+### Feature Types
+
+Autumn supports several feature types:
+
+<Tabs>
+  <Tab title="Metered">
+    **Metered features** track usage that increments over time:
+    
+    ```typescript
+    {
+      "type": "metered",
+      "config": {
+        // Metered configuration
+      }
+    }
+    ```
+    
+    **Examples**: API calls, emails sent, storage used
+  </Tab>
+  
+  <Tab title="Credit System">
+    **Credit system features** use credits that can be spent on multiple actions:
+    
+    ```typescript
+    {
+      "type": "credit_system",
+      "config": {
+        "credit_schema": [
+          {
+            "metered_feature_id": "video-processing",
+            "credit_cost": 10
+          },
+          {
+            "metered_feature_id": "image-processing",
+            "credit_cost": 1
+          }
+        ]
+      }
+    }
+    ```
+    
+    **Examples**: Processing credits, compute units, action credits
+  </Tab>
+  
+  <Tab title="Boolean">
+    **Boolean features** are simple on/off flags:
+    
+    ```typescript
+    {
+      "type": "boolean"
+    }
+    ```
+    
+    **Examples**: Premium features, beta access, feature flags
+  </Tab>
+</Tabs>
+
+### Feature Configuration
+
+#### Metered Config
+
+```typescript
+// From featureConfig/meteredConfig.ts
+config: {
+  type: "metered";
+  // Additional metered configuration
+}
+```
+
+#### Credit System Config
+
+```typescript
+// From featureConfig/creditConfig.ts
+config: {
+  type: "credit_system";
+  credit_schema: [
+    {
+      metered_feature_id: string;  // Feature that consumes credits
+      credit_cost: number;          // Credits required
+    }
+  ];
+}
+```
+
+### Event Names
+
+Features can be triggered by specific events:
+
+```typescript
+event_names: ["api.request", "api.call"];  // Events that increment this feature
+```
+
+When you track these events via `/track`, Autumn automatically increments the feature usage.
+
+### Display Configuration
+
+Configure how features appear in UIs:
+
+```typescript
+display: {
+  singular: "API Call";   // Shown for count = 1
+  plural: "API Calls";     // Shown for count ≠ 1
+}
+```
+
+## Entitlements
+
+### What is an Entitlement?
+
+An **entitlement** is a feature granted to a product. It defines the allowance and reset behavior:
+
+```typescript
+// From entTable.ts
+entitlement: {
+  id: string;
+  internal_feature_id: string;
+  internal_product_id: string;
+  created_at: number;
+  
+  // Allowance configuration
+  allowance_type: "limited" | "unlimited";
+  allowance: number;               // Amount granted
+  
+  // Reset configuration
+  interval: "day" | "week" | "month" | "year";
+  interval_count: number;          // Reset frequency multiplier
+  
+  // Rollover configuration
+  carry_from_previous: boolean;    // Enable rollover
+  rollover: {                      // Rollover config
+    max: number | null;            // Max rollover amount
+    expiry_duration_type: string;  // When unused balance expires
+    expiry_duration_length: number;
+  };
+  
+  // Per-entity support
+  entity_feature_id: string;       // For entity-scoped entitlements
+  
+  // Usage limits
+  usage_limit: number;             // Hard limit before blocking
+}
+```
+
+### Allowance Types
+
+<CardGroup cols={2}>
+  <Card title="Limited" icon="gauge">
+    Specific amount granted:
+    ```json
+    {
+      "allowance_type": "limited",
+      "allowance": 10000
+    }
+    ```
+  </Card>
+  
+  <Card title="Unlimited" icon="infinity">
+    No limits applied:
+    ```json
+    {
+      "allowance_type": "unlimited"
+    }
+    ```
+  </Card>
+</CardGroup>
+
+### Reset Intervals
+
+Entitlements reset on a schedule:
+
+```typescript
+reset: {
+  interval: "month";       // Reset monthly
+  interval_count: 1;       // Every 1 month
+}
+```
+
+**Common patterns**:
+- Daily: `{ interval: "day", interval_count: 1 }`
+- Weekly: `{ interval: "week", interval_count: 1 }`
+- Monthly: `{ interval: "month", interval_count: 1 }`
+- Quarterly: `{ interval: "month", interval_count: 3 }`
+- Yearly: `{ interval: "year", interval_count: 1 }`
+
+### Rollover Configuration
+
+Allow unused balance to carry over:
+
+```typescript
+rollover: {
+  max: 5000;                           // Max rollover: 5000 units
+  expiry_duration_type: "months";      // Unused balance expires after
+  expiry_duration_length: 3;           // 3 months
+}
+```
+
+**Example**: Customer has 10,000 units/month. They use 6,000. Next month:
+- Without rollover: 10,000 units
+- With rollover (max 5,000): 14,000 units (10,000 + 4,000 carried)
+
+## Customer Entitlements
+
+### What is a Customer Entitlement?
+
+A **customer_entitlement** is the active instance of an entitlement for a specific customer:
+
+```typescript
+// From cusEntTable.ts
+customer_entitlement: {
+  id: string;
+  customer_product_id: string;      // Which product granted this
+  entitlement_id: string;           // Source entitlement
+  internal_customer_id: string;
+  internal_entity_id: string;       // Optional: entity-scoped
+  internal_feature_id: string;
+  
+  // Current state
+  balance: number;                  // Remaining balance
+  unlimited: boolean;               // Unlimited access
+  usage_allowed: boolean;           // Can use this feature
+  
+  // Balance management
+  additional_balance: number;       // Bonus balance added
+  adjustment: number;               // Balance adjustment
+  
+  // Timing
+  created_at: number;
+  next_reset_at: number;            // When balance resets
+  expires_at: number;               // When entitlement expires
+  
+  // Per-entity balances
+  entities: {
+    [entityId: string]: {
+      balance: number;
+      unlimited: boolean;
+    }
+  };
+  
+  // Cache control
+  cache_version: number;            // For cache invalidation
+}
+```
+
+### Balance Management
+
+**Initial balance**: Set when product attaches
+```typescript
+balance: 10000;  // Starting allowance
+```
+
+**After usage**: Balance decreases
+```typescript
+balance: 7500;   // 2500 used
+```
+
+**Additional balance**: Bonus added via API
+```typescript
+additional_balance: 5000;  // Bonus credits
+balance: 12500;            // 7500 + 5000
+```
+
+### Entity-scoped Balances
+
+Track balance per entity:
+
+```typescript
+{
+  "feature_id": "storage-gb",
+  "balance": 100,  // Total balance
+  "entities": {
+    "workspace-1": {
+      "balance": 35,
+      "unlimited": false
+    },
+    "workspace-2": {
+      "balance": 65,
+      "unlimited": false
+    }
+  }
+}
+```
+
+This enables:
+- Per-workspace limits
+- Isolated usage tracking
+- Entity-level reporting
+
+## Checking Entitlements
+
+### The `/check` Endpoint
+
+Before allowing an action, check if the customer has access:
+
+```bash
+POST /check
+{
+  "customer_id": "user_123",
+  "feature_id": "api-calls"
+}
+```
+
+**Response**:
+```json
+{
+  "access": true,
+  "limit": 10000,
+  "usage": 2500,
+  "remaining": 7500,
+  "reset_at": 1735689600,
+  "unlimited": false
+}
+```
+
+### Check with Amount
+
+Check if customer can consume a specific amount:
+
+```bash
+POST /check
+{
+  "customer_id": "user_123",
+  "feature_id": "api-calls",
+  "amount": 100
+}
+```
+
+**Response indicates**: Can customer make 100 API calls?
+
+### Entity-scoped Checks
+
+Check entitlements for specific entities:
+
+```bash
+POST /check
+{
+  "customer_id": "user_123",
+  "feature_id": "storage-gb",
+  "entity_id": "workspace-1"
+}
+```
+
+## Usage Tracking
+
+### The `/track` Endpoint
+
+Record usage after an action occurs:
+
+```bash
+POST /track
+{
+  "customer_id": "user_123",
+  "event_name": "api.request",
+  "amount": 1
+}
+```
+
+Autumn automatically:
+1. Finds features with matching `event_names`
+2. Decrements customer entitlement balances
+3. Records event for analytics
+4. Triggers billing if usage-based pricing is configured
+
+### Credit System Usage
+
+Track usage that consumes credits:
+
+```bash
+POST /track
+{
+  "customer_id": "user_123",
+  "event_name": "video.processed",
+  "properties": {
+    "duration_seconds": 60
+  }
+}
+```
+
+If "video.processed" costs 10 credits, balance decreases by 10.
+
+## Usage Limits
+
+### Soft Limits vs Hard Limits
+
+**Soft limits** (allowance): Customer gets this much included
+```typescript
+allowance: 10000;  // 10,000 included
+```
+
+**Hard limits** (usage_limit): Block at this threshold
+```typescript
+usage_limit: 15000;  // Block after 15,000
+```
+
+**Example**: Customer has 10,000 included, can overage to 15,000:
+- 0-10,000: Included in plan
+- 10,001-15,000: Billed as overage
+- 15,001+: Blocked
+
+### Handling Overages
+
+Configure overage pricing in plan items:
+
+```typescript
+price: {
+  amount: 50;              // $0.50 per 100 units
+  billing_units: 100;      // Billed in blocks of 100
+  billing_method: "per_unit";  // Bill per unit consumed
+}
+```
+
+See [Pricing Models](/concepts/pricing-models) for overage billing details.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always check before allowing access">
+    Call `/check` before granting access to ensure customer has entitlement and balance.
+  </Accordion>
+  
+  <Accordion title="Track usage immediately after actions">
+    Call `/track` right after the action completes to ensure accurate metering.
+  </Accordion>
+  
+  <Accordion title="Use descriptive feature IDs">
+    Choose clear IDs like `api-calls` or `storage-gb` rather than generic names.
+  </Accordion>
+  
+  <Accordion title="Configure rollover for better UX">
+    Allow rollover on features where customers might not use full allowance monthly.
+  </Accordion>
+  
+  <Accordion title="Set appropriate hard limits">
+    Prevent runaway usage with `usage_limit` to protect your infrastructure.
+  </Accordion>
+  
+  <Accordion title="Use entities for multi-tenant applications">
+    Leverage entity-scoped entitlements when customers need workspace-level isolation.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pricing Models" icon="dollar-sign" href="/concepts/pricing-models">
+    Learn how to price features and overages
+  </Card>
+  
+  <Card title="Check Access" icon="shield-check" href="/api/core/check">
+    API reference for checking entitlements
+  </Card>
+  
+  <Card title="Track Usage" icon="chart-line" href="/api/core/track">
+    API reference for usage tracking
+  </Card>
+  
+  <Card title="Manage Balances" icon="scale-balanced" href="/api/balances/update">
+    Add or adjust customer balances
+  </Card>
+</CardGroup>

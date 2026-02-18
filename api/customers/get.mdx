@@ -1,0 +1,238 @@
+---
+title: 'Get Customer'
+api: 'GET /customers/{customer_id}'
+---
+
+Retrieves a customer by their ID. Returns the customer object with their active subscriptions, balances, and optionally expanded related data.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header as a Bearer token.
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The unique identifier of the customer to retrieve. This should be the ID you provided when creating the customer, or the Autumn-generated ID.
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="expand" type="string[]" optional>
+  Expand related objects in the response. You can pass multiple values as comma-separated or as an array. Available options:
+  - `invoices` - Include customer invoices
+  - `entities` - Include associated entities (e.g., teams, organizations)
+  - `trials_used` - Include trial usage history
+  - `rewards` - Include active rewards, discounts, and coupons
+  - `referrals` - Include referral program data
+  - `payment_method` - Include saved payment method details
+</ParamField>
+
+## Response
+
+Returns the customer object with all active subscriptions and feature balances.
+
+<ResponseField name="id" type="string">
+  Your unique identifier for the customer
+</ResponseField>
+
+<ResponseField name="autumn_id" type="string">
+  Autumn's internal ID for the customer (only visible with internal flags)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Customer's name
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Customer's email address
+</ResponseField>
+
+<ResponseField name="created_at" type="number">
+  Unix timestamp (in seconds) when the customer was created
+</ResponseField>
+
+<ResponseField name="fingerprint" type="string">
+  Unique device/hardware identifier for fraud detection
+</ResponseField>
+
+<ResponseField name="stripe_id" type="string">
+  Stripe customer ID if connected to Stripe
+</ResponseField>
+
+<ResponseField name="env" type="string">
+  Environment: `production`, `staging`, or `development`
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Custom metadata key-value pairs
+</ResponseField>
+
+<ResponseField name="send_email_receipts" type="boolean">
+  Whether email receipts are enabled for this customer
+</ResponseField>
+
+<ResponseField name="subscriptions" type="array">
+  Array of active subscriptions with full plan details and billing information
+</ResponseField>
+
+<ResponseField name="scheduled_subscriptions" type="array">
+  Array of subscriptions scheduled to activate in the future
+</ResponseField>
+
+<ResponseField name="balances" type="object">
+  Object mapping feature IDs to their current balance state, including granted amounts, usage, and reset schedules
+</ResponseField>
+
+<ResponseField name="invoices" type="array" expandable>
+  Array of customer invoices (only included if `expand=invoices` is set)
+</ResponseField>
+
+<ResponseField name="entities" type="array" expandable>
+  Array of associated entities like teams or workspaces (only included if `expand=entities` is set)
+</ResponseField>
+
+<ResponseField name="trials_used" type="array" expandable>
+  Trial usage history (only included if `expand=trials_used` is set)
+</ResponseField>
+
+<ResponseField name="rewards" type="object" expandable>
+  Active rewards, discounts, and coupons (only included if `expand=rewards` is set)
+</ResponseField>
+
+<ResponseField name="referrals" type="array" expandable>
+  Referral program data (only included if `expand=referrals` is set)
+</ResponseField>
+
+<ResponseField name="payment_method" type="object" expandable>
+  Saved payment method details (only included if `expand=payment_method` is set)
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://api.autumnai.com/customers/user_12345" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL (with expand)
+curl -X GET "https://api.autumnai.com/customers/user_12345?expand=invoices,payment_method" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/sdk';
+
+const autumn = new Autumn({
+  apiKey: process.env.AUTUMN_API_KEY
+});
+
+// Basic retrieval
+const customer = await autumn.customers.get('user_12345');
+
+// With expanded data
+const customerWithInvoices = await autumn.customers.get('user_12345', {
+  expand: ['invoices', 'payment_method']
+});
+```
+
+```python Python
+from autumn import Autumn
+
+autumn = Autumn(api_key=os.environ.get('AUTUMN_API_KEY'))
+
+# Basic retrieval
+customer = autumn.customers.get('user_12345')
+
+# With expanded data
+customer_with_invoices = autumn.customers.get(
+  'user_12345',
+  expand=['invoices', 'payment_method']
+)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "id": "user_12345",
+  "name": "Alice Johnson",
+  "email": "alice@example.com",
+  "created_at": 1708272000,
+  "fingerprint": null,
+  "stripe_id": "cus_stripe123",
+  "env": "production",
+  "metadata": {
+    "company": "Acme Corp",
+    "plan_tier": "enterprise"
+  },
+  "send_email_receipts": true,
+  "subscriptions": [
+    {
+      "plan_id": "pro_plan",
+      "status": "active",
+      "default": true,
+      "add_on": false,
+      "started_at": 1708272000,
+      "current_period_start": 1708272000,
+      "current_period_end": 1710864000,
+      "trial_ends_at": null,
+      "canceled_at": null,
+      "expires_at": null,
+      "past_due": false,
+      "quantity": 5
+    }
+  ],
+  "scheduled_subscriptions": [],
+  "balances": {
+    "api_calls": {
+      "feature_id": "api_calls",
+      "unlimited": false,
+      "granted_balance": 10000,
+      "purchased_balance": 0,
+      "current_balance": 7500,
+      "usage": 2500,
+      "overage_allowed": true,
+      "max_purchase": 100000,
+      "reset": {
+        "interval": "month",
+        "interval_count": 1,
+        "resets_at": 1710864000
+      },
+      "plan_id": "pro_plan"
+    }
+  }
+}
+```
+
+```json 404 Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer user_12345 not found"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+</ResponseExample>
+
+## Notes
+
+- The customer's balances object provides real-time feature usage and limits
+- Use the `expand` parameter to include related data and reduce the number of API calls
+- Subscriptions include detailed billing cycle information for usage-based and subscription-based pricing
+- The `balances` object is indexed by feature ID for quick lookups

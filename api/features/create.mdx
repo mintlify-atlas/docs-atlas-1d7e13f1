@@ -1,0 +1,151 @@
+---
+title: 'Create Feature'
+openapi: 'POST /features'
+---
+
+Create a new feature in your Autumn workspace. Features represent measurable aspects of your product that you want to track and monetize.
+
+## Feature Types
+
+<ParamField path="type" type="enum" required>
+  The type of the feature:
+  
+  - `single_use` - Consumed features like API calls, tokens, or messages
+  - `continuous_use` - Allocated features like seats, workspaces, or projects
+  - `credit_system` - Schemas that unify multiple single_use features into a unified credit system
+</ParamField>
+
+## Request Body
+
+<ParamField path="id" type="string" required>
+  The ID of the feature. This is used to refer to it in other API calls like `/track` or `/check`.
+  
+  Must match the pattern: lowercase letters, numbers, hyphens, and underscores only.
+</ParamField>
+
+<ParamField path="name" type="string">
+  The name of the feature. If not provided, defaults to the ID.
+</ParamField>
+
+<ParamField path="type" type="enum" required>
+  The type of the feature. `single_use` features are consumed, like API calls, tokens, or messages. `continuous_use` features are allocated, like seats, workspaces, or projects. `credit_system` features are schemas that unify multiple `single_use` features into a single credit system.
+</ParamField>
+
+<ParamField path="consumable" type="boolean">
+  Whether the feature is consumable. Required when type is `single_use` or `credit_system`. Credit system features must be consumable.
+</ParamField>
+
+<ParamField path="display" type="object">
+  Singular and plural display names for the feature in your user interface.
+  
+  <Expandable title="Display Object">
+    <ParamField path="singular" type="string">
+      Singular display name (e.g., "API Call")
+    </ParamField>
+    
+    <ParamField path="plural" type="string">
+      Plural display name (e.g., "API Calls")
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="credit_schema" type="array">
+  A schema that maps `single_use` feature IDs to credit costs. Applicable only for `credit_system` features. Required when type is `credit_system`.
+  
+  <Expandable title="Credit Schema Item">
+    <ParamField path="metered_feature_id" type="string" required>
+      The ID of the single_use feature to map
+    </ParamField>
+    
+    <ParamField path="credit_cost" type="number" required>
+      The credit cost for this feature
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="event_names" type="array">
+  Array of event names associated with this feature.
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  The ID of the created feature
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The name of the feature
+</ResponseField>
+
+<ResponseField name="type" type="enum">
+  The type of the feature: `single_use`, `continuous_use`, or `credit_system`
+</ResponseField>
+
+<ResponseField name="consumable" type="boolean">
+  Whether the feature is consumable
+</ResponseField>
+
+<ResponseField name="event_names" type="array">
+  Array of event names associated with this feature
+</ResponseField>
+
+<ResponseField name="credit_schema" type="array">
+  Credit schema mapping for credit_system features
+  
+  <Expandable title="Schema Item">
+    <ResponseField name="metered_feature_id" type="string">
+      The ID of the mapped feature
+    </ResponseField>
+    
+    <ResponseField name="credit_cost" type="number">
+      The credit cost
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="display" type="object">
+  Display names for the feature
+  
+  <Expandable title="Display">
+    <ResponseField name="singular" type="string">
+      Singular display name
+    </ResponseField>
+    
+    <ResponseField name="plural" type="string">
+      Plural display name
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="archived" type="boolean">
+  Whether the feature is archived
+</ResponseField>
+
+## Example
+
+```json Request
+{
+  "id": "api_calls",
+  "name": "API Calls",
+  "type": "single_use",
+  "consumable": true,
+  "display": {
+    "singular": "API Call",
+    "plural": "API Calls"
+  }
+}
+```
+
+```json Response
+{
+  "id": "api_calls",
+  "name": "API Calls",
+  "type": "single_use",
+  "consumable": true,
+  "display": {
+    "singular": "API Call",
+    "plural": "API Calls"
+  },
+  "archived": false
+}
+```

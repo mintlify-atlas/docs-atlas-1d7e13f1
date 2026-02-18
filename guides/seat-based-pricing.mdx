@@ -1,0 +1,827 @@
+---
+title: "Seat-Based Pricing"
+description: "Implement per-seat billing with dynamic seat management and entity tracking"
+---
+
+## Overview
+
+Seat-based pricing charges customers per user, team member, or other entity. Autumn provides flexible seat management with automatic proration, seat limits, and entity-level usage tracking.
+
+## When to Use Seat-Based Pricing
+
+- **SaaS platforms**: Charge per team member or user account
+- **Collaboration tools**: Bill for active collaborators
+- **License-based software**: Charge per license or workstation
+- **Multi-tenant applications**: Bill per tenant or workspace
+- **Project management**: Charge per project or client
+
+## Setting Up Seat-Based Pricing
+
+<Steps>
+  <Step title="Create an entity feature">
+    Define a feature to represent seats:
+
+    ```typescript
+    const seatFeature = await fetch('https://api.useautumn.com/features', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        feature_id: 'team_seats',
+        name: 'Team Seats',
+        type: 'entity',
+        description: 'Billable team member seats'
+      })
+    });
+    ```
+  </Step>
+
+  <Step title="Configure seat pricing in your product">
+    Set up a product with per-seat pricing:
+
+    ```typescript
+    const product = {
+      plan_id: 'business_plan',
+      name: 'Business Plan',
+      price: {
+        amount: 2000,  // $20 per seat
+        interval: 'month',
+        interval_count: 1
+      },
+      items: [
+        {
+          feature_id: 'team_seats',
+          included: 5,        // 5 seats included
+          unlimited: false,
+          price: {
+            amount: 2000,     // $20 per additional seat
+            billing_units: 1,
+            billing_method: 'per_unit',
+            interval: 'month'
+          },
+          proration: {
+            on_increase: 'prorated_immediately',  // Charge prorated when adding
+            on_decrease: 'end_of_period'          // Credit at period end when removing
+          }
+        }
+      ]
+    };
+    ```
+
+    **Pricing model**: Base of $100/month (5 seats × $20) + $20 per additional seat
+  </Step>
+
+  <Step title="Attach product with initial seats">
+    Subscribe a customer with their initial seat count:
+
+    ```typescript
+    const subscribeCustomer = async (customerId: string, seatCount: number) => {
+      const response = await fetch('https://api.useautumn.com/attach', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          product_id: 'business_plan',
+          feature_quantities: [{
+            feature_id: 'team_seats',
+            quantity: seatCount  // e.g., 8 seats
+          }]
+        })
+      });
+
+      return await response.json();
+    };
+
+    // Subscribe with 8 seats
+    await subscribeCustomer('cus_123', 8);
+    // Charge: (5 included × $20) + (3 additional × $20) = $160/month
+    ```
+  </Step>
+
+  <Step title="Create entities for each seat">
+    Track individual team members as entities:
+
+    ```typescript
+    const addTeamMember = async ({
+      customerId,
+      memberId,
+      memberName,
+      memberEmail
+    }: {
+      customerId: string;
+      memberId: string;
+      memberName: string;
+      memberEmail: string;
+    }) => {
+      // Create the entity
+      const response = await fetch('https://api.useautumn.com/entities', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          entity_id: memberId,
+          name: memberName,
+          metadata: {
+            email: memberEmail,
+            added_at: new Date().toISOString()
+          }
+        })
+      });
+
+      return await response.json();
+    };
+
+    // Add team member
+    await addTeamMember({
+      customerId: 'cus_123',
+      memberId: 'user_456',
+      memberName: 'Jane Smith',
+      memberEmail: 'jane@example.com'
+    });
+    ```
+  </Step>
+</Steps>
+
+## Adding and Removing Seats
+
+### Add Seats (Increase Quantity)
+
+When a customer adds team members:
+
+```typescript
+const addSeats = async (customerId: string, newSeatCount: number) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_quantities: [{
+        feature_id: 'team_seats',
+        quantity: newSeatCount  // New total (not delta)
+      }],
+      billing_behavior: 'prorate_immediately'  // Charge prorated amount now
+    })
+  });
+
+  return await response.json();
+};
+
+// Customer currently has 8 seats, adding 2 more for total of 10
+await addSeats('cus_123', 10);
+
+// Prorated charge calculation:
+// - Current period: 30 days, 15 days remaining
+// - Additional seats: 2
+// - Per-seat price: $20/month
+// - Prorated charge: (2 seats × $20) × (15/30) = $20
+```
+
+### Remove Seats (Decrease Quantity)
+
+```typescript
+const removeSeats = async (customerId: string, newSeatCount: number) => {
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_quantities: [{
+        feature_id: 'team_seats',
+        quantity: newSeatCount
+      }]
+      // billing_behavior defaults based on proration config
+    })
+  });
+
+  return await response.json();
+};
+
+// Reduce from 10 seats to 7
+await removeSeats('cus_123', 7);
+
+// If proration.on_decrease = 'end_of_period':
+// - Customer keeps 10 seats until period ends
+// - Next period bills for 7 seats
+// - No immediate credit
+
+// If proration.on_decrease = 'prorated_immediately':
+// - Immediately reduce to 7 seats
+// - Credit prorated amount: (3 seats × $20) × (15/30) = $30 credit
+```
+
+### Complete Seat Management Flow
+
+```typescript
+class SeatManager {
+  private apiKey: string;
+  private baseUrl = 'https://api.useautumn.com';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async getCurrentSeats(customerId: string): Promise<number> {
+    const response = await fetch(`${this.baseUrl}/check`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'team_seats'
+      })
+    });
+
+    const data = await response.json();
+    return data.balance?.quantity || 0;
+  }
+
+  async addSeat(customerId: string, userId: string, userData: any) {
+    // Get current seat count
+    const currentSeats = await this.getCurrentSeats(customerId);
+    const newSeats = currentSeats + 1;
+
+    // Create entity for the user
+    await fetch(`${this.baseUrl}/entities`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        entity_id: userId,
+        name: userData.name,
+        metadata: userData
+      })
+    });
+
+    // Update seat count
+    const response = await fetch(`${this.baseUrl}/update-subscription`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_quantities: [{
+          feature_id: 'team_seats',
+          quantity: newSeats
+        }],
+        billing_behavior: 'prorate_immediately'
+      })
+    });
+
+    return await response.json();
+  }
+
+  async removeSeat(customerId: string, userId: string) {
+    // Delete the entity
+    await fetch(`${this.baseUrl}/entities/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify({
+        customer_id: customerId
+      })
+    });
+
+    // Get new seat count
+    const currentSeats = await this.getCurrentSeats(customerId);
+    const newSeats = Math.max(1, currentSeats - 1);  // Minimum 1 seat
+
+    // Update seat count
+    const response = await fetch(`${this.baseUrl}/update-subscription`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_quantities: [{
+          feature_id: 'team_seats',
+          quantity: newSeats
+        }]
+      })
+    });
+
+    return await response.json();
+  }
+
+  async listSeats(customerId: string) {
+    const response = await fetch(
+      `${this.baseUrl}/entities?customer_id=${customerId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      }
+    );
+
+    return await response.json();
+  }
+}
+
+// Usage
+const seatManager = new SeatManager(process.env.AUTUMN_API_KEY!);
+
+// Add a seat
+await seatManager.addSeat('cus_123', 'user_456', {
+  name: 'John Doe',
+  email: 'john@example.com',
+  role: 'developer'
+});
+
+// Remove a seat
+await seatManager.removeSeat('cus_123', 'user_456');
+
+// List all seats
+const seats = await seatManager.listSeats('cus_123');
+```
+
+## Seat Limits
+
+### Minimum Seats
+
+Enforce a minimum seat count:
+
+```typescript
+const MIN_SEATS = 3;
+
+const updateSeats = async (customerId: string, requestedSeats: number) => {
+  const seatCount = Math.max(MIN_SEATS, requestedSeats);
+  
+  const response = await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_quantities: [{
+        feature_id: 'team_seats',
+        quantity: seatCount
+      }]
+    })
+  });
+
+  return await response.json();
+};
+```
+
+### Maximum Seats
+
+Set a maximum seat limit per plan:
+
+```typescript
+const PLAN_LIMITS = {
+  starter: 5,
+  business: 25,
+  enterprise: null  // Unlimited
+};
+
+const addSeat = async (customerId: string, planType: string) => {
+  // Check current seats
+  const checkResponse = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'team_seats'
+    })
+  });
+
+  const { balance } = await checkResponse.json();
+  const currentSeats = balance?.quantity || 0;
+  const maxSeats = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS];
+
+  if (maxSeats !== null && currentSeats >= maxSeats) {
+    throw new Error(
+      `Seat limit reached. Please upgrade to add more seats. Current: ${currentSeats}, Max: ${maxSeats}`
+    );
+  }
+
+  // Add the seat
+  return await fetch('https://api.useautumn.com/update-subscription', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_quantities: [{
+        feature_id: 'team_seats',
+        quantity: currentSeats + 1
+      }]
+    })
+  }).then(r => r.json());
+};
+```
+
+## Entity Management
+
+### Track Entity-Level Usage
+
+Track usage per team member:
+
+```typescript
+const trackUserActivity = async ({
+  customerId,
+  userId,
+  activityType,
+  value
+}: {
+  customerId: string;
+  userId: string;
+  activityType: string;
+  value: number;
+}) => {
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      entity_id: userId,  // Track for specific entity
+      feature_id: activityType,
+      value: value,
+      properties: {
+        timestamp: Date.now()
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Track API calls per user
+await trackUserActivity({
+  customerId: 'cus_123',
+  userId: 'user_456',
+  activityType: 'api_calls',
+  value: 1
+});
+```
+
+### Get Entity Usage
+
+```typescript
+const getEntityUsage = async (customerId: string, entityId: string) => {
+  const response = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      entity_id: entityId,
+      feature_id: 'api_calls'
+    })
+  });
+
+  return await response.json();
+};
+```
+
+### List All Entities
+
+```typescript
+const getAllTeamMembers = async (customerId: string) => {
+  const response = await fetch(
+    `https://api.useautumn.com/entities?customer_id=${customerId}`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+
+  const data = await response.json();
+  return data.entities || [];
+};
+```
+
+## User Interface Components
+
+### Seat Management UI
+
+```tsx
+import React, { useState, useEffect } from 'react';
+
+interface Seat {
+  entity_id: string;
+  name: string;
+  metadata: {
+    email: string;
+    role: string;
+    added_at: string;
+  };
+}
+
+interface SeatManagerProps {
+  customerId: string;
+  planLimit: number | null;
+}
+
+const SeatManagerUI: React.FC<SeatManagerProps> = ({ customerId, planLimit }) => {
+  const [seats, setSeats] = useState<Seat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => {
+    fetchSeats();
+  }, [customerId]);
+
+  const fetchSeats = async () => {
+    try {
+      const response = await fetch(`/api/seats?customer_id=${customerId}`);
+      const data = await response.json();
+      setSeats(data.entities || []);
+    } catch (error) {
+      console.error('Failed to fetch seats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddSeat = async (userData: any) => {
+    try {
+      await fetch('/api/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          ...userData
+        })
+      });
+      
+      await fetchSeats();
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('Failed to add seat:', error);
+      alert('Failed to add seat: ' + error.message);
+    }
+  };
+
+  const handleRemoveSeat = async (entityId: string) => {
+    if (!confirm('Remove this team member?')) return;
+
+    try {
+      await fetch(`/api/seats/${entityId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId })
+      });
+      
+      await fetchSeats();
+    } catch (error) {
+      console.error('Failed to remove seat:', error);
+      alert('Failed to remove seat: ' + error.message);
+    }
+  };
+
+  const canAddSeats = planLimit === null || seats.length < planLimit;
+
+  if (loading) return <div>Loading team members...</div>;
+
+  return (
+    <div className="seat-manager">
+      <div className="seat-header">
+        <h2>Team Members</h2>
+        <div className="seat-count">
+          {seats.length} {planLimit && `/ ${planLimit}`} seats
+        </div>
+      </div>
+
+      {!canAddSeats && (
+        <div className="limit-warning">
+          You've reached your plan's seat limit. 
+          <a href="/upgrade">Upgrade to add more seats</a>
+        </div>
+      )}
+
+      <button 
+        onClick={() => setShowAddModal(true)}
+        disabled={!canAddSeats}
+        className="add-seat-button"
+      >
+        Add Team Member
+      </button>
+
+      <div className="seat-list">
+        {seats.map(seat => (
+          <div key={seat.entity_id} className="seat-item">
+            <div className="seat-info">
+              <h3>{seat.name}</h3>
+              <p>{seat.metadata.email}</p>
+              <span className="role-badge">{seat.metadata.role}</span>
+            </div>
+            <button 
+              onClick={() => handleRemoveSeat(seat.entity_id)}
+              className="remove-button"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {showAddModal && (
+        <AddSeatModal 
+          onAdd={handleAddSeat}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+```
+
+## Proration Strategies
+
+### Immediate Proration (Recommended)
+
+```typescript
+{
+  proration: {
+    on_increase: 'prorated_immediately',  // Charge now
+    on_decrease: 'end_of_period'          // Credit at period end
+  }
+}
+```
+
+**Benefits**:
+- Simple and predictable
+- Aligns charges with actual usage
+- Standard SaaS practice
+
+### No Proration
+
+```typescript
+{
+  proration: {
+    on_increase: 'full_immediately',  // Charge full amount
+    on_decrease: 'end_of_period'      // No refund, change at period end
+  }
+}
+```
+
+**Use when**:
+- You want to simplify billing
+- Seat changes are infrequent
+- You prefer predictable monthly charges
+
+## Advanced Patterns
+
+### Seat Utilization Tracking
+
+```typescript
+const trackSeatUtilization = async (customerId: string) => {
+  // Get all entities
+  const entities = await getAllTeamMembers(customerId);
+  
+  // Check usage for each entity
+  const utilizationData = await Promise.all(
+    entities.map(async (entity) => {
+      const response = await fetch('https://api.useautumn.com/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          entity_id: entity.entity_id,
+          feature_id: 'api_calls'
+        })
+      });
+      
+      const data = await response.json();
+      return {
+        entity_id: entity.entity_id,
+        name: entity.name,
+        usage: data.balance?.usage || 0,
+        last_active: data.balance?.last_used_at
+      };
+    })
+  );
+
+  // Find inactive seats
+  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const inactiveSeats = utilizationData.filter(
+    seat => !seat.last_active || seat.last_active < thirtyDaysAgo
+  );
+
+  return {
+    total_seats: entities.length,
+    active_seats: entities.length - inactiveSeats.length,
+    inactive_seats: inactiveSeats,
+    utilization_rate: ((entities.length - inactiveSeats.length) / entities.length) * 100
+  };
+};
+```
+
+### Tiered Seat Pricing
+
+```typescript
+const tieredSeatProduct = {
+  plan_id: 'business_tiered',
+  name: 'Business Plan (Tiered)',
+  items: [
+    {
+      feature_id: 'team_seats',
+      included: 1,  // 1 seat minimum
+      price: {
+        tiers: [
+          { to: 5, amount: 2000 },      // 1-5 seats: $20/seat
+          { to: 20, amount: 1500 },     // 6-20 seats: $15/seat
+          { to: 'inf', amount: 1000 }   // 21+ seats: $10/seat
+        ],
+        billing_units: 1,
+        billing_method: 'per_unit',
+        interval: 'month'
+      }
+    }
+  ]
+};
+
+// Pricing examples:
+// 3 seats:  3 × $20 = $60/month
+// 10 seats: (5 × $20) + (5 × $15) = $175/month
+// 25 seats: (5 × $20) + (15 × $15) + (5 × $10) = $375/month
+```
+
+## Best Practices
+
+<Tip>
+  **Always show prorated charges before confirming**: Display the immediate charge when adding seats so there are no surprises.
+</Tip>
+
+<Warning>
+  **Enforce minimum seats carefully**: Ensure customers can't reduce below a minimum that makes your product unusable.
+</Warning>
+
+<Note>
+  **Track entity-level usage**: This data helps you identify unused seats and provide value to your customers.
+</Note>
+
+### Billing Communication
+
+1. **Be transparent**: Show exactly what customers will be charged
+2. **Explain proration**: Make it clear how mid-cycle changes work
+3. **Send notifications**: Email when seats are added/removed
+4. **Provide invoices**: Detail seat changes on invoices
+
+### Technical Implementation
+
+1. **Atomic operations**: Update seats and entities together
+2. **Validation**: Verify seat limits before allowing additions
+3. **Error handling**: Handle payment failures gracefully
+4. **Audit trail**: Log all seat changes for compliance
+5. **Webhooks**: Listen for seat change events from Autumn
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Subscriptions" icon="rotate" href="/guides/managing-subscriptions">
+    Handle plan changes and updates
+  </Card>
+  
+  <Card title="Usage-Based Billing" icon="chart-line" href="/guides/usage-based-billing">
+    Combine seats with usage pricing
+  </Card>
+  
+  <Card title="Entity API" icon="users" href="/api/entities/create">
+    Complete entity documentation
+  </Card>
+  
+  <Card title="Update Subscription" icon="code" href="/api/core/attach">
+    API reference for seat updates
+  </Card>
+</CardGroup>

@@ -1,0 +1,166 @@
+---
+title: 'Authentication'
+description: 'Learn how to authenticate your API requests to Autumn'
+---
+
+## Overview
+
+Autumn uses API key authentication to secure all API requests. Every request to the Autumn API must include a valid API key in the authorization header.
+
+## API Key Types
+
+Autumn provides two types of API keys for different environments:
+
+<AccordionGroup>
+  <Accordion title="Test Keys" icon="flask">
+    Test keys are prefixed with `am_sk_test_` and are used for development and testing environments. They operate in sandbox mode and won't process real payments through Stripe.
+    
+    - **Prefix:** `am_sk_test_`
+    - **Use case:** Development, testing, and sandbox environments
+    - **Stripe mode:** Test mode
+  </Accordion>
+
+  <Accordion title="Live Keys" icon="lock">
+    Live keys are prefixed with `am_sk_live_` and are used for production environments. They process real payments and should be kept secure.
+    
+    - **Prefix:** `am_sk_live_`
+    - **Use case:** Production environments
+    - **Stripe mode:** Live mode
+  </Accordion>
+</AccordionGroup>
+
+## Key Format
+
+Autumn API keys follow this structure:
+
+```
+[prefix]_[42-character-alphanumeric-string]
+```
+
+For example:
+- Test: `am_sk_test_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn`
+- Live: `am_sk_live_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn`
+
+## Authentication Method
+
+Include your API key in the `Authorization` header of every request:
+
+```bash
+curl https://api.useautumn.com/v1/customers \
+  -H "Authorization: Bearer am_sk_test_your_key_here"
+```
+
+<CodeGroup>
+
+```typescript TypeScript
+const response = await fetch('https://api.useautumn.com/v1/customers', {
+  headers: {
+    'Authorization': 'Bearer am_sk_test_your_key_here',
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': 'Bearer am_sk_test_your_key_here',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get('https://api.useautumn.com/v1/customers', headers=headers)
+```
+
+```javascript JavaScript
+fetch('https://api.useautumn.com/v1/customers', {
+  headers: {
+    'Authorization': 'Bearer am_sk_test_your_key_here',
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+</CodeGroup>
+
+## Security Best Practices
+
+<Warning>
+  Never expose your API keys in client-side code, public repositories, or version control systems.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Store Securely" icon="shield">
+    Use environment variables or secret management services to store your API keys.
+  </Card>
+  <Card title="Rotate Regularly" icon="rotate">
+    Periodically rotate your API keys and revoke old ones to maintain security.
+  </Card>
+  <Card title="Separate Environments" icon="code-branch">
+    Use test keys for development and live keys only in production.
+  </Card>
+  <Card title="Monitor Usage" icon="chart-line">
+    Track API key usage in your dashboard to detect unusual activity.
+  </Card>
+</CardGroup>
+
+## Key Generation
+
+API keys are generated using cryptographically secure random values (SHA-256 hashing). Each key:
+
+- Contains 42 alphanumeric characters
+- Is hashed before storage using SHA-256
+- Cannot be retrieved after creation (only the prefix is visible)
+
+<Note>
+  When you create a new API key, make sure to copy it immediately. For security reasons, you won't be able to view the full key again after creation.
+</Note>
+
+## Managing API Keys
+
+You can manage your API keys from the Autumn dashboard:
+
+1. Navigate to **Settings** → **API Keys**
+2. Create new keys with custom names for identification
+3. Revoke keys that are no longer needed
+4. View key prefixes and creation dates
+
+## Environment Detection
+
+Autumn automatically determines the environment based on your API key prefix:
+
+- `am_sk_test_` keys connect to test mode (sandbox)
+- `am_sk_live_` keys connect to live mode (production)
+
+This ensures you can't accidentally mix test and production data.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Invalid API Key" icon="circle-xmark">
+    If you receive an authentication error:
+    
+    - Verify the key includes the full prefix and string
+    - Check that you're using the correct environment key
+    - Ensure the key hasn't been revoked
+    - Confirm the `Authorization` header format is correct
+  </Accordion>
+
+  <Accordion title="Key Not Working After Rotation" icon="clock">
+    API keys are cached for up to 1 hour (3600 seconds). After rotating keys:
+    
+    - Wait up to 1 hour for the old key to expire
+    - Or use a new key immediately and revoke the old one
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Rate Limits" icon="gauge" href="/resources/rate-limits">
+    Learn about API rate limits and quotas
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/resources/errors">
+    Handle authentication errors properly
+  </Card>
+</CardGroup>

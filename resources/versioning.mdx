@@ -1,0 +1,276 @@
+---
+title: 'API Versioning'
+description: 'Learn about Autumn API versioning and version management'
+---
+
+## Overview
+
+Autumn uses API versioning to ensure backward compatibility while allowing us to introduce new features and improvements. Our versioning system is designed to minimize breaking changes and provide smooth upgrade paths.
+
+## Version Format
+
+Autumn API versions follow semantic versioning: `v1.X`
+
+- **Major version (v1):** Included in the URL path `/v1/customers`
+- **Minor version (1.X):** Specified via header or defaults to latest
+
+## Current API Version
+
+The current API version is **v1.2**. All new integrations should target this version.
+
+<Note>
+  If no version header is specified, requests default to the latest stable version.
+</Note>
+
+## Specifying API Version
+
+Specify the API version using the `Autumn-Version` header:
+
+```bash
+curl https://api.useautumn.com/v1/customers/cus_123 \
+  -H "Authorization: Bearer am_sk_test_your_key" \
+  -H "Autumn-Version: 1.2"
+```
+
+<CodeGroup>
+
+```typescript TypeScript
+const response = await fetch('https://api.useautumn.com/v1/customers/cus_123', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Autumn-Version': '1.2'
+  }
+});
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {api_key}',
+    'Autumn-Version': '1.2'
+}
+
+response = requests.get(
+    'https://api.useautumn.com/v1/customers/cus_123',
+    headers=headers
+)
+```
+
+</CodeGroup>
+
+## Version Change Architecture
+
+Autumn uses a sophisticated compositional versioning system that handles shared schema components across multiple resources.
+
+### How It Works
+
+1. **Shared transformation logic** - Common transformations are defined once and reused
+2. **Resource-level version changes** - Each resource has its own version changes
+3. **Automatic application** - Version transformations are applied automatically based on the requested version
+
+### Example: Feature Schema Changes
+
+When a schema component (like `CoreCusFeatureSchema`) is shared across multiple resources, version changes are applied consistently:
+
+```typescript
+// Shared transformation utility
+export const transformFeatureV1_2ToV1_1 = (feature) => {
+  // Transform v1.2 format (with breakdown) to v1.1 format
+  if (feature.breakdown && feature.breakdown.length > 0) {
+    // Expand breakdown into separate entries
+    return feature.breakdown.map(item => ({
+      feature_id: feature.id,
+      interval: item.interval,
+      balance: item.balance,
+      // ...
+    }));
+  }
+  return [feature];
+};
+
+// Applied to Customer resource
+export const V1_2_FeaturesArrayToObject = defineVersionChange({
+  version: ApiVersion.V1_2,
+  affectedResources: [AffectedResource.Customer],
+  transformResponse: ({ input }) => {
+    const v1_1_features = Object.values(input.features)
+      .flatMap(transformFeatureV1_2ToV1_1);
+    return { ...input, features: v1_1_features };
+  }
+});
+```
+
+## Version Changes
+
+### Version 1.2 (Latest)
+
+<AccordionGroup>
+  <Accordion title="Features: Object with Breakdown" icon="layer-group">
+    **Change:** Features are returned as an object with a `breakdown` array instead of a flat array.
+    
+    **v1.2 Response:**
+    ```json
+    {
+      "features": {
+        "ai_tokens": {
+          "id": "ai_tokens",
+          "type": "usage",
+          "breakdown": [
+            {
+              "interval": "month",
+              "interval_count": 1,
+              "balance": 1000,
+              "usage": 250
+            }
+          ]
+        }
+      }
+    }
+    ```
+    
+    **v1.1 Response (backward compatible):**
+    ```json
+    {
+      "features": [
+        {
+          "feature_id": "ai_tokens",
+          "interval": "month",
+          "interval_count": 1,
+          "balance": 1000,
+          "usage": 250
+        }
+      ]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="CheckResult: Feature Fields" icon="check">
+    **Change:** CheckResult now includes feature fields with breakdown structure.
+    
+    **v1.2 Response:**
+    ```json
+    {
+      "allowed": true,
+      "customer_id": "cus_123",
+      "feature_id": "ai_tokens",
+      "type": "usage",
+      "breakdown": [...]
+    }
+    ```
+    
+    **v1.1 Response:**
+    ```json
+    {
+      "allowed": true,
+      "customer_id": "cus_123",
+      "feature_id": "ai_tokens",
+      "interval": "month",
+      "balance": 1000
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Version 1.1
+
+Previous stable version with flat feature arrays.
+
+<Warning>
+  Version 1.1 is maintained for backward compatibility but we recommend upgrading to v1.2 for new integrations.
+</Warning>
+
+## Affected Resources
+
+Version changes specify which resources they affect:
+
+- **Customer** - Customer objects and related endpoints
+- **CheckResult** - Results from `/check` and `/entitled` endpoints
+- **Product** - Product configurations and listings
+- **Feature** - Feature definitions and entitlements
+- **Entity** - Entity objects (seats, users, etc.)
+
+## Version Change Principles
+
+<CardGroup cols={2}>
+  <Card title="Shared Logic" icon="share-nodes">
+    Transformation logic is defined once in utility functions and reused across all affected resources.
+  </Card>
+  
+  <Card title="Resource-Level Changes" icon="cube">
+    Each resource has its own version changes that specify which resources they affect.
+  </Card>
+  
+  <Card title="Automatic Application" icon="wand-magic-sparkles">
+    Version transformations are automatically applied based on the requested API version header.
+  </Card>
+  
+  <Card title="Type Safety" icon="shield">
+    All schemas are validated at compile-time to ensure correctness.
+  </Card>
+</CardGroup>
+
+## Backward Compatibility
+
+Autumn maintains backward compatibility by:
+
+1. **Transforming responses** - New format responses are automatically transformed to older formats
+2. **Supporting old request formats** - Old request formats are accepted and converted internally
+3. **Default versioning** - Requests without a version header use the latest stable version
+
+<Note>
+  Your existing integrations will continue to work even as we release new versions.
+</Note>
+
+## Adding New Schema Components
+
+When adding features that share schema components:
+
+1. **Create transformation utilities** for the shared component
+2. **Create version changes** for each affected resource
+3. **Register version changes** in the version registry
+4. **Apply at endpoints** using `applyResponseVersionChanges()`
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pin Your Version" icon="thumbtack">
+    Always specify the API version in your requests for consistent behavior.
+  </Card>
+  
+  <Card title="Test Before Upgrading" icon="flask">
+    Test new versions in your development environment before upgrading production.
+  </Card>
+  
+  <Card title="Review Changelog" icon="list">
+    Check the changelog before upgrading to understand what changed.
+  </Card>
+  
+  <Card title="Use Latest Features" icon="rocket">
+    Upgrade to the latest version to access new features and improvements.
+  </Card>
+</CardGroup>
+
+## Deprecation Policy
+
+When we deprecate an API version:
+
+1. **6 months notice** - We announce the deprecation with at least 6 months advance notice
+2. **Migration guide** - We provide detailed migration guides
+3. **Support period** - Deprecated versions continue to work during the deprecation period
+4. **Final sunset** - After the deprecation period, the version is removed
+
+<Warning>
+  We'll notify you via email and in-app notifications before deprecating any version.
+</Warning>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Changelog" icon="clock-rotate-left" href="/resources/changelog">
+    View version release notes
+  </Card>
+  <Card title="Migration Guide" icon="arrow-right" href="/resources/migration-guide">
+    Learn how to upgrade versions
+  </Card>
+</CardGroup>

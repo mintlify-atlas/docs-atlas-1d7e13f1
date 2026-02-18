@@ -1,0 +1,351 @@
+---
+title: 'Cancel Product'
+openapi: 'POST /cancel'
+---
+
+# Cancel Product
+
+Cancel a customer's subscription to a product. Supports both immediate cancellation and end-of-period cancellation.
+
+## When to Use
+
+Use this when a customer wants to stop their subscription. You can choose to cancel immediately or at the end of the current billing period.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header:
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Request Body
+
+<ParamField body="customer_id" type="string" required>
+  The ID of the customer
+  
+  **Example:** `cus_123`
+</ParamField>
+
+<ParamField body="product_id" type="string" required>
+  The ID of the product to cancel
+  
+  **Example:** `pro_plan`
+</ParamField>
+
+<ParamField body="entity_id" type="string">
+  The ID of the entity (optional, for entity-scoped subscriptions)
+  
+  **Example:** `entity_123`
+</ParamField>
+
+<ParamField body="cancel_immediately" type="boolean">
+  Whether to cancel the product immediately or at period end
+  
+  - `true` - Cancel immediately and revoke access now
+  - `false` - Schedule cancellation for end of billing period (customer retains access until then)
+  
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="prorate" type="boolean">
+  Whether to prorate the cancellation and issue a credit for unused time
+  
+  - `true` - Issue a prorated credit for the remaining billing period
+  - `false` - No refund or credit issued
+  
+  **Default:** `true`
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  Whether the cancellation was successful
+</ResponseField>
+
+<ResponseField name="customer_id" type="string" required>
+  The ID of the customer
+</ResponseField>
+
+<ResponseField name="product_id" type="string" required>
+  The ID of the canceled product
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.useautumn.com/cancel \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "cus_123",
+    "product_id": "pro_plan"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.useautumn.com/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    product_id: 'pro_plan'
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+```typescript TypeScript
+interface CancelRequest {
+  customer_id: string;
+  product_id: string;
+  entity_id?: string;
+  cancel_immediately?: boolean;
+  prorate?: boolean;
+}
+
+interface CancelResponse {
+  success: boolean;
+  customer_id: string;
+  product_id: string;
+}
+
+const response = await fetch('https://api.useautumn.com/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    product_id: 'pro_plan',
+    cancel_immediately: false,
+    prorate: true
+  } as CancelRequest)
+});
+
+const data: CancelResponse = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.useautumn.com/cancel',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={
+        'customer_id': 'cus_123',
+        'product_id': 'pro_plan'
+    }
+)
+
+data = response.json()
+print(f"Cancellation successful: {data['success']}")
+```
+
+</CodeGroup>
+
+## Example Response
+
+### Successful Cancellation
+
+```json
+{
+  "success": true,
+  "customer_id": "cus_123",
+  "product_id": "pro_plan"
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "customer_id and product_id are required"
+  }
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer does not have an active subscription to this product"
+  }
+}
+```
+
+## Use Cases
+
+### Cancel at Period End (Recommended)
+
+Allow the customer to continue using the service until their billing period ends:
+
+```typescript
+const cancelSubscription = async (customerId: string, productId: string) => {
+  const response = await fetch('https://api.useautumn.com/cancel', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: productId,
+      cancel_immediately: false,  // Cancel at period end
+      prorate: true  // Issue credit for unused time
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (data.success) {
+    console.log('Subscription will be canceled at the end of the billing period');
+  }
+  
+  return data;
+};
+```
+
+### Immediate Cancellation
+
+Revoke access immediately:
+
+```javascript
+const response = await fetch('https://api.useautumn.com/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    product_id: 'pro_plan',
+    cancel_immediately: true,  // Revoke access now
+    prorate: true  // Issue prorated refund
+  })
+});
+```
+
+### Cancel Without Proration
+
+Cancel without issuing any credits:
+
+```javascript
+const response = await fetch('https://api.useautumn.com/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    product_id: 'pro_plan',
+    cancel_immediately: false,
+    prorate: false  // No refund or credit
+  })
+});
+```
+
+### Cancel Entity-Scoped Subscription
+
+Cancel a subscription for a specific entity (e.g., a team workspace):
+
+```typescript
+const response = await fetch('https://api.useautumn.com/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    product_id: 'team_plan',
+    entity_id: 'workspace_456',  // Cancel for this workspace only
+    cancel_immediately: false
+  })
+});
+```
+
+### Building a Cancellation Flow
+
+```typescript
+const handleCancellation = async (
+  customerId: string,
+  productId: string,
+  reason?: string
+) => {
+  // 1. Show cancellation options to user
+  const userChoice = await showCancellationDialog({
+    immediate: 'Cancel immediately and get a prorated refund',
+    endOfPeriod: 'Cancel at the end of your billing period'
+  });
+  
+  // 2. Process cancellation based on user choice
+  const response = await fetch('https://api.useautumn.com/cancel', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      product_id: productId,
+      cancel_immediately: userChoice === 'immediate',
+      prorate: true
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (data.success) {
+    // 3. Log cancellation reason for analytics
+    await logCancellationReason(customerId, productId, reason);
+    
+    // 4. Show confirmation to user
+    if (userChoice === 'immediate') {
+      showMessage('Your subscription has been canceled and a refund has been issued.');
+    } else {
+      showMessage('Your subscription will be canceled at the end of your billing period.');
+    }
+  }
+  
+  return data;
+};
+```
+
+## Notes
+
+- By default, cancellations are scheduled for the end of the billing period with proration enabled
+- When `cancel_immediately` is `false`, the customer retains access to the product until the end of their current billing period
+- Proration credits are typically applied to the customer's account balance and used for future purchases
+- If a customer has multiple subscriptions, you need to cancel each one separately
+- For entity-scoped subscriptions, provide the `entity_id` to cancel a specific entity's subscription
+- The cancellation is processed immediately by the API, but billing changes may take a few moments to propagate

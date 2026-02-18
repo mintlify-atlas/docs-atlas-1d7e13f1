@@ -1,0 +1,526 @@
+---
+title: 'Frequently Asked Questions'
+description: 'Common questions about Autumn'
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is Autumn?" icon="leaf">
+    Autumn is an open-source billing infrastructure layer between Stripe and your application. It allows you to create any pricing model - subscriptions, credits, usage-based billing, seat-based pricing, and more - without handling webhooks, upgrades/downgrades, or payment failures manually.
+    
+    Autumn decouples your billing logic from your application code, making it easy to iterate on pricing without code changes.
+  </Accordion>
+
+  <Accordion title="How does Autumn work with Stripe?" icon="stripe">
+    Autumn sits between your application and Stripe:
+    
+    1. You define products and pricing models in Autumn's dashboard
+    2. Autumn creates and manages corresponding Stripe products/prices
+    3. Your app uses Autumn's API (`/attach`, `/check`, `/track`) for all billing operations
+    4. Autumn handles Stripe webhooks and keeps everything in sync
+    5. Payments flow through Stripe as normal
+    
+    Autumn never touches your money - it's purely a billing orchestration layer.
+  </Accordion>
+
+  <Accordion title="Do I need a Stripe account?" icon="question">
+    Yes, Autumn requires a Stripe account. Autumn handles the billing logic, but Stripe processes the actual payments.
+    
+    You'll need to:
+    - Create a Stripe account
+    - Get your Stripe API keys
+    - Configure them in Autumn (dashboard or environment variables)
+  </Accordion>
+
+  <Accordion title="Is Autumn open source?" icon="code">
+    Yes! Autumn is fully open source under the MIT license. You can:
+    - View the source code on [GitHub](https://github.com/useautumn/autumn)
+    - Self-host it on your own infrastructure
+    - Contribute improvements and features
+    - Fork it for custom modifications
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Pricing & Plans
+
+<AccordionGroup>
+  <Accordion title="Is Autumn free?" icon="dollar-sign">
+    Autumn offers both free and paid options:
+    
+    **Self-Hosted (Free):**
+    - Open source and free forever
+    - Host on your own infrastructure
+    - Pay only for your infrastructure costs
+    - Community support via Discord and GitHub
+    
+    **Cloud (Paid):**
+    - Hosted by us at [app.useautumn.com](https://app.useautumn.com)
+    - No infrastructure management
+    - Automatic updates and maintenance
+    - Priority support
+    - SLA guarantees (enterprise plans)
+    
+    Contact [hey@useautumn.com](mailto:hey@useautumn.com) for cloud pricing.
+  </Accordion>
+
+  <Accordion title="What are the infrastructure costs for self-hosting?" icon="server">
+    Self-hosting Autumn requires:
+    
+    **Required:**
+    - PostgreSQL database (~$15-50/month depending on provider and scale)
+    - Compute instance for the API server (~$20-100/month)
+    - Compute instance for the web dashboard (~$10-50/month)
+    
+    **Optional but recommended:**
+    - Redis for caching (~$10-30/month)
+    - ClickHouse for analytics (~$20-100/month)
+    
+    **Total:** Approximately $50-300/month depending on scale and provider.
+    
+    Popular hosting options:
+    - Supabase (Postgres)
+    - Upstash (Redis)
+    - ClickHouse Cloud
+    - Railway, Render, or Fly.io for compute
+  </Accordion>
+
+  <Accordion title="Do you offer a free trial for cloud?" icon="calendar">
+    Yes! Contact us at [hey@useautumn.com](mailto:hey@useautumn.com) to set up a free trial of our cloud platform.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Pricing Models
+
+<AccordionGroup>
+  <Accordion title="What pricing models does Autumn support?" icon="tag">
+    Autumn supports any pricing model imaginable, including:
+    
+    **Subscriptions:**
+    - Simple monthly/yearly subscriptions
+    - Tiered plans (Free, Pro, Enterprise)
+    - Grandfathered pricing
+    
+    **Usage-Based:**
+    - Metered usage with overages
+    - Usage limits that reset (daily, weekly, monthly)
+    - Unlimited usage plans
+    
+    **Credit Systems:**
+    - Monetary credits
+    - Arbitrary credit units
+    - Credit top-ups and purchases
+    - Credits that roll over or expire
+    
+    **Seat-Based:**
+    - Per-user pricing
+    - Per-seat pricing with individual limits
+    - Team plans with seat allocations
+    
+    **Hybrid Models:**
+    - Base subscription + usage overages
+    - Credits included in subscription + top-ups
+    - Multiple features with different billing models
+  </Accordion>
+
+  <Accordion title="Can I combine multiple pricing models?" icon="layer-group">
+    Absolutely! Autumn excels at hybrid pricing. For example:
+    
+    - Base subscription ($50/month) + usage overages ($0.10/unit)
+    - Seat-based pricing ($10/seat) + usage limits per seat
+    - Credits included in plan (1000 credits) + ability to purchase more
+    - Multiple features with different billing (some usage-based, some unlimited)
+    
+    Configure all of this in the dashboard without code changes.
+  </Accordion>
+
+  <Accordion title="Can I change pricing without code changes?" icon="wand-magic-sparkles">
+    Yes! This is Autumn's superpower. You can change:
+    
+    - Prices
+    - Usage limits
+    - Feature availability
+    - Billing intervals
+    - Overage charges
+    
+    All from the dashboard, without touching your code. Existing customers can be grandfathered on old pricing automatically.
+  </Accordion>
+
+  <Accordion title="How do I grandfather users on old pricing?" icon="clock-rotate-left">
+    When you change pricing:
+    
+    1. Create a new product/price in Autumn
+    2. Existing customers automatically stay on their current product
+    3. New customers get the new pricing
+    4. You can manually migrate specific customers if needed
+    
+    Autumn handles this automatically - no code changes required.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="What languages/frameworks does Autumn support?" icon="code">
+    Autumn is language-agnostic! It provides a REST API that works with any language or framework:
+    
+    - JavaScript/TypeScript (Node.js, Next.js, React, etc.)
+    - Python (Django, Flask, FastAPI, etc.)
+    - Ruby (Rails, Sinatra, etc.)
+    - PHP (Laravel, Symfony, etc.)
+    - Go
+    - Java
+    - Any language with HTTP client support
+    
+    We also provide SDK libraries for popular languages (TypeScript/JavaScript, Python coming soon).
+  </Accordion>
+
+  <Accordion title="How do I integrate Autumn into my app?" icon="puzzle-piece">
+    Integration is simple - just three API endpoints:
+    
+    1. **`/attach`** - Handle purchases, upgrades, and downgrades
+       ```typescript
+       await attach({ productId: 'pro' });
+       ```
+    
+    2. **`/check`** - Check feature access and remaining usage
+       ```typescript
+       const { allowed } = await check({ featureId: 'ai_tokens' });
+       ```
+    
+    3. **`/track`** - Record usage events
+       ```typescript
+       await track({ featureId: 'ai_tokens', value: 100 });
+       ```
+    
+    See the [Quickstart](/quickstart) for a complete guide.
+  </Accordion>
+
+  <Accordion title="Do I need to handle Stripe webhooks?" icon="webhook">
+    No! Autumn handles all Stripe webhooks for you:
+    
+    - `checkout.session.completed`
+    - `invoice.payment_succeeded`
+    - `invoice.payment_failed`
+    - `customer.subscription.updated`
+    - `customer.subscription.deleted`
+    
+    Autumn automatically updates customer entitlements based on webhook events. You just call the Autumn API.
+  </Accordion>
+
+  <Accordion title="How does Autumn handle failed payments?" icon="credit-card">
+    Autumn automatically handles failed payments:
+    
+    1. Stripe attempts payment according to your retry settings
+    2. If payment fails, Autumn receives the webhook
+    3. Customer access is automatically revoked
+    4. Your `/check` calls return `allowed: false`
+    5. When payment succeeds, access is restored automatically
+    
+    No manual intervention needed!
+  </Accordion>
+
+  <Accordion title="Can I use Autumn with my existing Stripe setup?" icon="stripe-s">
+    Yes! Autumn can work with existing Stripe products and customers:
+    
+    1. Import your existing Stripe products into Autumn
+    2. Autumn will manage them going forward
+    3. Existing subscriptions continue working
+    4. Gradually migrate to Autumn's API
+    
+    Contact support for migration assistance.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Performance & Scale
+
+<AccordionGroup>
+  <Accordion title="What are the API rate limits?" icon="gauge">
+    Autumn has generous rate limits:
+    
+    - **Track endpoints:** 10,000 req/sec per customer
+    - **Check endpoints:** 10,000 req/sec per customer
+    - **General endpoints:** 1,000 req/sec per organization
+    - **Attach endpoint:** 5 req/min per customer
+    
+    See [Rate Limits](/resources/rate-limits) for full details.
+    
+    Enterprise customers can request higher limits.
+  </Accordion>
+
+  <Accordion title="Can Autumn handle high-volume usage tracking?" icon="chart-line">
+    Yes! Autumn is designed for high-throughput usage tracking:
+    
+    - 10,000 requests/second per customer on track endpoints
+    - In-memory rate limiting for maximum performance
+    - Async processing for usage events
+    - ClickHouse for analytics queries
+    
+    Perfect for AI APIs, API platforms, and high-volume SaaS.
+  </Accordion>
+
+  <Accordion title="What's the API latency?" icon="clock">
+    Typical API latency (cloud hosted):
+    
+    - `/check`: <50ms (cached), <100ms (uncached)
+    - `/track`: <100ms
+    - `/attach`: <500ms (creates Stripe checkout)
+    
+    Self-hosted latency depends on your infrastructure and location.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Self-Hosting
+
+<AccordionGroup>
+  <Accordion title="How difficult is it to self-host Autumn?" icon="server">
+    Self-hosting is straightforward:
+    
+    **Easy setup (recommended):**
+    ```bash
+    bun install
+    bun setup
+    docker compose up
+    ```
+    
+    **Requirements:**
+    - Node.js and Bun installed
+    - PostgreSQL database
+    - Stripe account
+    
+    See the [Contributing Guide](/community/contributing) for detailed setup instructions.
+  </Accordion>
+
+  <Accordion title="What infrastructure do I need?" icon="building">
+    **Minimum (development):**
+    - PostgreSQL database
+    - 1 server for API + dashboard
+    
+    **Recommended (production):**
+    - PostgreSQL (managed service like Supabase)
+    - 2 servers (API and dashboard)
+    - Redis for caching
+    - ClickHouse for analytics (optional)
+    - Load balancer (for high availability)
+    
+    See [infrastructure costs](#what-are-the-infrastructure-costs-for-self-hosting) above.
+  </Accordion>
+
+  <Accordion title="Do you provide migration support from self-hosted to cloud?" icon="cloud-arrow-up">
+    Yes! We can help you migrate:
+    
+    1. Export your data from self-hosted
+    2. Import into cloud instance
+    3. Update API endpoint URLs
+    4. Verify everything works
+    
+    Contact [hey@useautumn.com](mailto:hey@useautumn.com) for migration assistance.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Security & Compliance
+
+<AccordionGroup>
+  <Accordion title="How does Autumn handle API keys?" icon="key">
+    Autumn uses secure API key authentication:
+    
+    - Keys are generated using cryptographically secure random values
+    - Keys are hashed with SHA-256 before storage
+    - Only key prefixes are visible after creation
+    - Keys are cached for 1 hour for performance
+    - Separate test and live keys
+    
+    See [Authentication](/resources/authentication) for details.
+  </Accordion>
+
+  <Accordion title="Does Autumn store credit card data?" icon="credit-card">
+    No. Autumn never sees or stores credit card data. All payment information is handled by Stripe according to PCI compliance standards.
+    
+    Autumn only stores:
+    - Customer IDs
+    - Product/subscription IDs
+    - Usage data
+    - Entitlements
+  </Accordion>
+
+  <Accordion title="Is Autumn GDPR compliant?" icon="shield-halved">
+    Autumn provides tools for GDPR compliance:
+    
+    - Delete customer data via API
+    - Export customer data
+    - Data retention policies (self-hosted)
+    
+    For cloud customers, we provide a DPA on request.
+  </Accordion>
+
+  <Accordion title="Can I use Autumn in a SOC 2 environment?" icon="check-double">
+    Yes. Many customers use Autumn in SOC 2 environments:
+    
+    - Self-host within your compliant infrastructure
+    - Use cloud with BAA/DPA (enterprise plans)
+    - Audit logs available
+    - Encryption in transit and at rest
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Support & Community
+
+<AccordionGroup>
+  <Accordion title="How do I get help?" icon="life-ring">
+    Multiple support channels:
+    
+    - **Discord** ([discord.gg/STqxY92zuS](https://discord.gg/STqxY92zuS)) - Fastest response, community + team
+    - **Email** ([hey@useautumn.com](mailto:hey@useautumn.com)) - Direct support
+    - **GitHub Issues** - Bug reports and feature requests
+    - **Documentation** - Comprehensive guides
+    
+    See [Support](/community/support) for details.
+  </Accordion>
+
+  <Accordion title="Is there a community?" icon="users">
+    Yes! Join our Discord community:
+    
+    - Ask questions and get help
+    - Share what you're building
+    - Request features
+    - Connect with other developers
+    - Get updates on new releases
+    
+    Join at [discord.gg/STqxY92zuS](https://discord.gg/STqxY92zuS)
+  </Accordion>
+
+  <Accordion title="Can I contribute to Autumn?" icon="code-branch">
+    Absolutely! We welcome all contributions:
+    
+    - Bug fixes
+    - New features
+    - Documentation improvements
+    - Tests
+    
+    See the [Contributing Guide](/community/contributing) to get started.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Comparisons
+
+<AccordionGroup>
+  <Accordion title="How is Autumn different from using Stripe directly?" icon="stripe">
+    **Stripe:**
+    - You handle webhooks manually
+    - Billing logic mixed with application code
+    - Pricing changes require code deploys
+    - Complex pricing models need custom code
+    - You manage entitlements and permissions
+    
+    **Autumn:**
+    - Webhooks handled automatically
+    - Billing logic decoupled from your app
+    - Change pricing from dashboard, no code changes
+    - Any pricing model supported out of the box
+    - Automatic entitlement management
+    
+    Autumn is a layer on top of Stripe that handles all the complexity.
+  </Accordion>
+
+  <Accordion title="How does Autumn compare to other billing platforms?" icon="scale-balanced">
+    **vs. Chargebee/Recurly:**
+    - Autumn is open source (self-host or use cloud)
+    - Simpler API (3 endpoints vs dozens)
+    - Built for modern usage-based pricing
+    - Better developer experience
+    
+    **vs. Stripe Billing:**
+    - Autumn handles webhook complexity
+    - Supports more flexible pricing models
+    - Decoupled from your application
+    - Real-time usage checking
+    
+    **vs. Building it yourself:**
+    - Saves months of development
+    - Battle-tested edge case handling
+    - Ongoing maintenance and updates
+    - Focus on your core product
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Why isn't my webhook working?" icon="webhook">
+    Common webhook issues:
+    
+    1. **Localtunnel not running** (development)
+       - Check Docker Compose is running
+       - Verify `LOCALTUNNEL_RESERVED_KEY` is set
+    
+    2. **Wrong webhook URL** (production)
+       - Verify `STRIPE_WEBHOOK_URL` in environment
+       - Check Stripe dashboard webhook endpoints
+    
+    3. **Webhook signature failing**
+       - Ensure webhook signing secret is correct
+       - Check webhook version compatibility
+  </Accordion>
+
+  <Accordion title="Why is my API key not working?" icon="key">
+    Check:
+    
+    1. **Full key included** - Must include `am_sk_test_` or `am_sk_live_` prefix
+    2. **Authorization header** - Format: `Bearer your_key_here`
+    3. **Not revoked** - Check dashboard
+    4. **Correct environment** - Test key with test products, live key with live products
+    
+    See [Authentication Troubleshooting](/resources/authentication#troubleshooting).
+  </Accordion>
+
+  <Accordion title="Why is usage not tracking?" icon="chart-line">
+    Common issues:
+    
+    1. **Wrong customer ID** - Verify customer exists
+    2. **Wrong feature ID** - Check feature exists in product
+    3. **Feature not on customer's plan** - Customer must have the feature
+    4. **Rate limit exceeded** - Check rate limit headers
+    
+    Check server logs for detailed error messages.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/STqxY92zuS">
+    Ask in our Discord for quick answers
+  </Card>
+  
+  <Card title="Email Us" icon="envelope" href="mailto:hey@useautumn.com">
+    Contact hey@useautumn.com
+  </Card>
+  
+  <Card title="Documentation" icon="book" href="/">
+    Browse our comprehensive docs
+  </Card>
+  
+  <Card title="GitHub" icon="github" href="https://github.com/useautumn/autumn">
+    View source code and examples
+  </Card>
+</CardGroup>

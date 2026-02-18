@@ -1,0 +1,745 @@
+---
+title: "Metering Usage"
+description: "Advanced patterns for tracking and aggregating customer usage"
+---
+
+## Overview
+
+Effective usage metering is crucial for accurate billing and providing customers with transparency. This guide covers best practices for tracking, aggregating, and reporting usage data.
+
+## Metering Strategies
+
+### Real-Time Metering
+
+Track usage immediately as it happens:
+
+```typescript
+// Real-time API call tracking
+const apiMiddleware = async (req, res, next) => {
+  const customerId = req.user.id;
+  
+  // Track usage synchronously
+  try {
+    const response = await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'api_calls',
+        value: 1,
+        properties: {
+          endpoint: req.path,
+          method: req.method,
+          timestamp: Date.now()
+        }
+      })
+    });
+
+    const data = await response.json();
+    
+    // Block if insufficient balance
+    if (!data.balance || data.balance.current_balance <= 0) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
+    }
+    
+    next();
+  } catch (error) {
+    // Fail open - don't block on tracking errors
+    console.error('Usage tracking failed:', error);
+    next();
+  }
+};
+```
+
+**Pros**:
+- Immediate enforcement of limits
+- Real-time balance updates
+- Prevents overage issues
+
+**Cons**:
+- Adds latency to requests
+- Requires high availability
+- More expensive at scale
+
+### Asynchronous Metering
+
+Track usage after the operation completes:
+
+```typescript
+const asyncTrackUsage = async (customerId: string, featureId: string, value: number) => {
+  // Return immediately, track in background
+  setImmediate(async () => {
+    try {
+      await fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: featureId,
+          value: value,
+          timestamp: Date.now()
+        })
+      });
+    } catch (error) {
+      console.error('Async tracking failed:', error);
+      // Implement retry logic or queue for later
+    }
+  });
+};
+
+// Usage
+app.post('/api/process', async (req, res) => {
+  const result = await processRequest(req.body);
+  
+  // Track asynchronously - doesn't block response
+  asyncTrackUsage(req.user.id, 'api_calls', 1);
+  
+  res.json(result);
+});
+```
+
+**Pros**:
+- Zero latency impact
+- Better performance
+- Scales easily
+
+**Cons**:
+- Delayed balance updates
+- Harder to enforce hard limits
+- Risk of lost events
+
+### Batch Metering
+
+Aggregate events and send in batches:
+
+```typescript
+class UsageBatcher {
+  private batch: Map<string, number> = new Map();
+  private flushInterval: NodeJS.Timeout;
+  private readonly BATCH_SIZE = 100;
+  private readonly FLUSH_INTERVAL_MS = 5000;
+
+  constructor(private apiKey: string) {
+    this.flushInterval = setInterval(() => this.flush(), this.FLUSH_INTERVAL_MS);
+  }
+
+  track(customerId: string, featureId: string, value: number = 1) {
+    const key = `${customerId}:${featureId}`;
+    const current = this.batch.get(key) || 0;
+    this.batch.set(key, current + value);
+
+    // Flush if batch is full
+    if (this.batch.size >= this.BATCH_SIZE) {
+      this.flush();
+    }
+  }
+
+  async flush() {
+    if (this.batch.size === 0) return;
+
+    const entries = Array.from(this.batch.entries());
+    this.batch.clear();
+
+    // Send all events in parallel
+    const promises = entries.map(([key, value]) => {
+      const [customerId, featureId] = key.split(':');
+      
+      return fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: featureId,
+          value: value,
+          idempotency_key: `batch-${Date.now()}-${key}`
+        })
+      }).catch(err => {
+        console.error(`Failed to track ${key}:`, err);
+        // Re-add to batch for retry
+        this.track(customerId, featureId, value);
+      });
+    });
+
+    await Promise.allSettled(promises);
+  }
+
+  shutdown() {
+    clearInterval(this.flushInterval);
+    return this.flush();
+  }
+}
+
+// Global batcher instance
+const usageBatcher = new UsageBatcher(process.env.AUTUMN_API_KEY!);
+
+// Track usage
+app.post('/api/*', (req, res, next) => {
+  usageBatcher.track(req.user.id, 'api_calls', 1);
+  next();
+});
+
+// Flush on shutdown
+process.on('SIGTERM', async () => {
+  await usageBatcher.shutdown();
+  process.exit(0);
+});
+```
+
+**Pros**:
+- Very high throughput
+- Minimal API calls
+- Cost-effective
+
+**Cons**:
+- Complex to implement
+- Risk of data loss on crashes
+- Delayed balance updates
+
+## Usage Aggregation
+
+### Time-Based Aggregation
+
+Aggregate usage by time period:
+
+```typescript
+const getUsageByPeriod = async ({
+  customerId,
+  featureId,
+  startDate,
+  endDate
+}: {
+  customerId: string;
+  featureId: string;
+  startDate: Date;
+  endDate: Date;
+}) => {
+  const response = await fetch(
+    `https://api.useautumn.com/events/aggregate?` +
+    `customer_id=${customerId}&` +
+    `feature_id=${featureId}&` +
+    `start_date=${startDate.toISOString()}&` +
+    `end_date=${endDate.toISOString()}&` +
+    `bin_size=day`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+
+  return await response.json();
+};
+
+// Get usage for last 30 days
+const usage = await getUsageByPeriod({
+  customerId: 'cus_123',
+  featureId: 'api_calls',
+  startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  endDate: new Date()
+});
+```
+
+### Feature-Based Aggregation
+
+Aggregate across multiple features:
+
+```typescript
+const getAllFeatureUsage = async (customerId: string) => {
+  const features = ['api_calls', 'storage_gb', 'compute_minutes'];
+  
+  const usageData = await Promise.all(
+    features.map(async (featureId) => {
+      const response = await fetch('https://api.useautumn.com/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: featureId
+        })
+      });
+      
+      const data = await response.json();
+      return {
+        feature_id: featureId,
+        usage: data.balance?.usage || 0,
+        balance: data.balance?.current_balance || 0,
+        granted: data.balance?.granted_balance || 0
+      };
+    })
+  );
+
+  return usageData;
+};
+```
+
+### Entity-Based Aggregation
+
+Aggregate usage by entity (user, project, etc.):
+
+```typescript
+const getUsageByEntity = async (customerId: string) => {
+  // Get all entities
+  const entitiesResponse = await fetch(
+    `https://api.useautumn.com/entities?customer_id=${customerId}`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+  
+  const { entities } = await entitiesResponse.json();
+
+  // Get usage for each entity
+  const entityUsage = await Promise.all(
+    entities.map(async (entity: any) => {
+      const response = await fetch('https://api.useautumn.com/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          entity_id: entity.entity_id,
+          feature_id: 'api_calls'
+        })
+      });
+      
+      const data = await response.json();
+      return {
+        entity_id: entity.entity_id,
+        name: entity.name,
+        usage: data.balance?.usage || 0
+      };
+    })
+  );
+
+  return entityUsage;
+};
+```
+
+## Event Properties and Metadata
+
+### Rich Event Tracking
+
+Include detailed metadata with usage events:
+
+```typescript
+const trackDetailedUsage = async ({
+  customerId,
+  featureId,
+  value,
+  context
+}: {
+  customerId: string;
+  featureId: string;
+  value: number;
+  context: {
+    userId?: string;
+    sessionId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    endpoint?: string;
+    method?: string;
+    responseTime?: number;
+    statusCode?: number;
+  };
+}) => {
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: featureId,
+      value: value,
+      properties: {
+        timestamp: Date.now(),
+        ...context
+      }
+    })
+  });
+
+  return await response.json();
+};
+
+// Usage
+await trackDetailedUsage({
+  customerId: 'cus_123',
+  featureId: 'api_calls',
+  value: 1,
+  context: {
+    userId: 'user_456',
+    sessionId: 'sess_789',
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+    endpoint: req.path,
+    method: req.method,
+    responseTime: Date.now() - req.startTime,
+    statusCode: res.statusCode
+  }
+});
+```
+
+### Query by Properties
+
+Filter usage data by event properties:
+
+```typescript
+const getUsageByEndpoint = async (customerId: string, endpoint: string) => {
+  const response = await fetch(
+    `https://api.useautumn.com/events/list?` +
+    `customer_id=${customerId}&` +
+    `feature_id=api_calls&` +
+    `properties.endpoint=${encodeURIComponent(endpoint)}`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+
+  return await response.json();
+};
+```
+
+## Metering Best Practices
+
+### 1. Idempotency
+
+Always use idempotency keys for critical tracking:
+
+```typescript
+const trackIdempotent = async ({
+  customerId,
+  featureId,
+  value,
+  operationId
+}: {
+  customerId: string;
+  featureId: string;
+  value: number;
+  operationId: string;  // Unique operation ID
+}) => {
+  const idempotencyKey = `${customerId}-${featureId}-${operationId}`;
+  
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: featureId,
+      value: value,
+      idempotency_key: idempotencyKey
+    })
+  });
+
+  return await response.json();
+};
+
+// Safe to retry without double-counting
+for (let attempt = 0; attempt < 3; attempt++) {
+  try {
+    await trackIdempotent({
+      customerId: 'cus_123',
+      featureId: 'api_calls',
+      value: 1,
+      operationId: 'op_unique_123'
+    });
+    break;
+  } catch (error) {
+    if (attempt === 2) throw error;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+}
+```
+
+### 2. Graceful Degradation
+
+Don't block user operations if tracking fails:
+
+```typescript
+const trackWithFallback = async (trackingData: any) => {
+  try {
+    await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(trackingData),
+      signal: AbortSignal.timeout(2000)  // 2 second timeout
+    });
+  } catch (error) {
+    console.error('Usage tracking failed:', error);
+    
+    // Fall back to local queue
+    await queueForRetry(trackingData);
+  }
+};
+
+const queueForRetry = async (data: any) => {
+  // Store in Redis/database for retry
+  await redis.lpush('usage_retry_queue', JSON.stringify(data));
+};
+
+// Background worker to process retry queue
+const processRetryQueue = async () => {
+  while (true) {
+    const data = await redis.rpop('usage_retry_queue');
+    if (!data) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      continue;
+    }
+    
+    try {
+      await fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: data
+      });
+    } catch (error) {
+      // Re-queue if still failing
+      await redis.lpush('usage_retry_queue', data);
+    }
+  }
+};
+```
+
+### 3. Rate Limiting
+
+Prevent abuse with rate limiting:
+
+```typescript
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+
+const checkRateLimit = (customerId: string, limit: number, windowMs: number) => {
+  const now = Date.now();
+  const key = customerId;
+  const record = rateLimiter.get(key);
+
+  if (!record || now > record.resetAt) {
+    rateLimiter.set(key, {
+      count: 1,
+      resetAt: now + windowMs
+    });
+    return true;
+  }
+
+  if (record.count >= limit) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+};
+
+// Use in middleware
+const rateLimitMiddleware = async (req, res, next) => {
+  const customerId = req.user.id;
+  const allowed = checkRateLimit(customerId, 100, 60000);  // 100 per minute
+
+  if (!allowed) {
+    return res.status(429).json({ error: 'Rate limit exceeded' });
+  }
+
+  // Track the usage
+  asyncTrackUsage(customerId, 'api_calls', 1);
+  next();
+};
+```
+
+### 4. Usage Validation
+
+Validate usage values before tracking:
+
+```typescript
+const validateAndTrack = async ({
+  customerId,
+  featureId,
+  value
+}: {
+  customerId: string;
+  featureId: string;
+  value: number;
+}) => {
+  // Validate input
+  if (value <= 0) {
+    throw new Error('Usage value must be positive');
+  }
+  
+  if (value > 1000000) {
+    throw new Error('Usage value suspiciously high');
+  }
+  
+  if (!customerId || !featureId) {
+    throw new Error('Customer ID and feature ID required');
+  }
+
+  // Track valid usage
+  const response = await fetch('https://api.useautumn.com/track', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: featureId,
+      value: Math.round(value)  // Ensure integer
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Tracking failed: ${response.status}`);
+  }
+
+  return await response.json();
+};
+```
+
+## Reporting and Analytics
+
+### Usage Dashboard Component
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+
+interface UsageData {
+  date: string;
+  value: number;
+}
+
+const UsageDashboard: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const [usageData, setUsageData] = useState<UsageData[]>([]);
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+
+  useEffect(() => {
+    fetchUsageData();
+  }, [customerId, timeRange]);
+
+  const fetchUsageData = async () => {
+    const response = await fetch(
+      `/api/usage/history?customer_id=${customerId}&range=${timeRange}`
+    );
+    const data = await response.json();
+    setUsageData(data.usage);
+  };
+
+  const totalUsage = usageData.reduce((sum, d) => sum + d.value, 0);
+  const avgDaily = totalUsage / usageData.length;
+
+  return (
+    <div className="usage-dashboard">
+      <div className="usage-stats">
+        <div className="stat-card">
+          <h3>Total Usage</h3>
+          <p className="stat-value">{totalUsage.toLocaleString()}</p>
+        </div>
+        <div className="stat-card">
+          <h3>Daily Average</h3>
+          <p className="stat-value">{Math.round(avgDaily).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="time-range-selector">
+        <button onClick={() => setTimeRange('7d')}>7 Days</button>
+        <button onClick={() => setTimeRange('30d')}>30 Days</button>
+        <button onClick={() => setTimeRange('90d')}>90 Days</button>
+      </div>
+
+      <LineChart width={800} height={400} data={usageData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="date" />
+        <YAxis />
+        <Tooltip />
+        <Line type="monotone" dataKey="value" stroke="#8884d8" />
+      </LineChart>
+    </div>
+  );
+};
+```
+
+### Export Usage Data
+
+```typescript
+const exportUsageToCSV = async ({
+  customerId,
+  startDate,
+  endDate
+}: {
+  customerId: string;
+  startDate: Date;
+  endDate: Date;
+}) => {
+  const response = await fetch(
+    `https://api.useautumn.com/events/list?` +
+    `customer_id=${customerId}&` +
+    `start_date=${startDate.toISOString()}&` +
+    `end_date=${endDate.toISOString()}&` +
+    `limit=10000`,
+    {
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY'
+      }
+    }
+  );
+
+  const { events } = await response.json();
+
+  // Convert to CSV
+  const csv = [
+    ['Date', 'Feature', 'Value', 'Properties'].join(','),
+    ...events.map((e: any) => [
+      new Date(e.timestamp).toISOString(),
+      e.feature_id,
+      e.value,
+      JSON.stringify(e.properties)
+    ].join(','))
+  ].join('\n');
+
+  return csv;
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Usage-Based Billing" icon="chart-line" href="/guides/usage-based-billing">
+    Implement usage-based pricing
+  </Card>
+  
+  <Card title="Track API" icon="code" href="/api/core/track">
+    Complete tracking documentation
+  </Card>
+  
+  <Card title="Events API" icon="list" href="/api/events/list">
+    Query usage events
+  </Card>
+  
+  <Card title="Analytics" icon="chart-bar" href="/api/analytics/insights">
+    Usage analytics endpoints
+  </Card>
+</CardGroup>

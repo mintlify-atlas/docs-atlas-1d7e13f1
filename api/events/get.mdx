@@ -1,0 +1,190 @@
+---
+title: 'Aggregate Events'
+openapi: 'POST /events/aggregate'
+---
+
+Aggregate events over a time period with optional grouping. This endpoint is useful for analytics and usage visualization.
+
+## Request Body
+
+<ParamField path="customer_id" type="string" required>
+  Customer ID to aggregate events for
+</ParamField>
+
+<ParamField path="feature_id" type="string | array" required>
+  Feature ID(s) to aggregate events for. Can be a single string or an array of strings.
+</ParamField>
+
+<ParamField path="group_by" type="string">
+  Property to group events by. Must start with `properties.` (e.g., `properties.region`).
+  
+  If provided, each key in the response will be an object with distinct groups as the keys.
+</ParamField>
+
+<ParamField path="range" type="enum">
+  Time range to aggregate events for. One of:
+  
+  - `24h` - Last 24 hours
+  - `7d` - Last 7 days
+  - `30d` - Last 30 days
+  - `90d` - Last 90 days
+  - `1bc` - Current billing cycle (default)
+  
+  Either `range` or `custom_range` must be provided, but not both.
+</ParamField>
+
+<ParamField path="bin_size" type="enum">
+  Size of the time bins to aggregate events for:
+  
+  - `hour` - Hourly bins (default for 24h range)
+  - `day` - Daily bins (default for other ranges)
+  
+  If not specified, automatically chosen based on the range.
+</ParamField>
+
+<ParamField path="custom_range" type="object">
+  Custom time range to aggregate events for. If provided, `range` must not be provided.
+  
+  <Expandable title="Custom Range">
+    <ParamField path="start" type="number" required>
+      Start timestamp (epoch milliseconds)
+    </ParamField>
+    
+    <ParamField path="end" type="number" required>
+      End timestamp (epoch milliseconds). Must be after start.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response (Without group_by)
+
+<ResponseField name="list" type="array">
+  Array of time period aggregations
+  
+  <Expandable title="Period Object">
+    <ResponseField name="period" type="number">
+      Timestamp marking the start of this period (epoch milliseconds)
+    </ResponseField>
+    
+    <ResponseField name="[feature_id]" type="number">
+      Sum of event values for this feature in this period. One field per feature.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="object">
+  Total aggregations across all periods
+  
+  <Expandable title="Feature Totals">
+    <ResponseField name="[feature_id]" type="object">
+      Aggregation for this feature
+      
+      <Expandable title="Aggregation">
+        <ResponseField name="count" type="number">
+          Number of periods with data
+        </ResponseField>
+        
+        <ResponseField name="sum" type="number">
+          Total sum across all periods
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response (With group_by)
+
+<ResponseField name="list" type="array">
+  Array of time period aggregations with grouped values
+  
+  <Expandable title="Period Object">
+    <ResponseField name="period" type="number">
+      Timestamp marking the start of this period
+    </ResponseField>
+    
+    <ResponseField name="[feature_id]" type="object">
+      Object with group values as keys and sums as values
+      
+      Example: `{ "us-east-1": 100, "us-west-2": 50 }`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="object">
+  Same structure as without group_by
+</ResponseField>
+
+## Examples
+
+```json Request - Simple Aggregation
+{
+  "customer_id": "cus_123",
+  "feature_id": ["messages", "seats"],
+  "range": "7d",
+  "bin_size": "day"
+}
+```
+
+```json Response - Simple Aggregation
+{
+  "list": [
+    {
+      "period": 1762905600000,
+      "messages": 10,
+      "seats": 3
+    },
+    {
+      "period": 1762992000000,
+      "messages": 3,
+      "seats": 12
+    }
+  ],
+  "total": {
+    "messages": {
+      "count": 2,
+      "sum": 13
+    },
+    "seats": {
+      "count": 2,
+      "sum": 15
+    }
+  }
+}
+```
+
+```json Request - Grouped Aggregation
+{
+  "customer_id": "cus_123",
+  "feature_id": "api_calls",
+  "range": "24h",
+  "bin_size": "hour",
+  "group_by": "properties.region"
+}
+```
+
+```json Response - Grouped Aggregation
+{
+  "list": [
+    {
+      "period": 1765958400000,
+      "api_calls": {
+        "us-east-1": 150,
+        "us-west-2": 75
+      }
+    },
+    {
+      "period": 1765962000000,
+      "api_calls": {
+        "us-east-1": 200,
+        "us-west-2": 100
+      }
+    }
+  ],
+  "total": {
+    "api_calls": {
+      "count": 2,
+      "sum": 525
+    }
+  }
+}
+```

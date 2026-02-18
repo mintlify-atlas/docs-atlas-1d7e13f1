@@ -1,0 +1,259 @@
+---
+title: 'Insights Query'
+api: 'POST /insights/query'
+description: 'Run custom SQL queries on your analytics data for advanced insights'
+---
+
+Execute custom SQL queries against your event data using ClickHouse SQL syntax. This endpoint provides powerful analytics capabilities for complex data analysis and custom reporting needs.
+
+<Warning>
+  This is an advanced endpoint that requires knowledge of SQL and the underlying data schema. Improper queries can affect performance. Use with caution in production environments.
+</Warning>
+
+## Use Cases
+
+- Generate custom analytics reports
+- Perform complex aggregations and joins
+- Build custom dashboards with specific metrics
+- Analyze event patterns and trends
+- Create advanced usage reports
+
+## Request Body
+
+<ParamField body="query" type="string" required>
+  SQL query to execute against your event data. Use the `events` table as the data source.
+
+  The query is automatically scoped to your organization and environment. You can reference the `events` table directly.
+
+  ```sql
+  SELECT 
+    event_name,
+    COUNT(*) as count
+  FROM events
+  WHERE timestamp >= NOW() - INTERVAL 7 DAY
+  GROUP BY event_name
+  ORDER BY count DESC
+  LIMIT 10
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="object">
+  Query results returned in JSON format. The structure depends on your SQL query.
+
+  For queries with multiple columns, each row is returned as an object with column names as keys.
+</ResponseField>
+
+## Query Restrictions
+
+### Virtual Tables
+The following virtual tables are restricted and cannot be queried directly:
+- `org_events_view` - Use `events` table instead
+
+### Query Transformation
+Your queries are automatically transformed to include organization and environment scoping:
+- References to `from events` are replaced with scoped view function calls
+- Organization ID and environment parameters are automatically injected
+- Results are limited to 1000 rows by default
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.useautumn.com/insights/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT event_name, COUNT(*) as count FROM events WHERE timestamp >= NOW() - INTERVAL 7 DAY GROUP BY event_name ORDER BY count DESC LIMIT 10"
+  }'
+```
+
+```javascript JavaScript
+const autumn = new Autumn({ apiKey: 'your_api_key' });
+
+const result = await autumn.insights.query({
+  query: `
+    SELECT 
+      event_name,
+      COUNT(*) as count
+    FROM events
+    WHERE timestamp >= NOW() - INTERVAL 7 DAY
+    GROUP BY event_name
+    ORDER BY count DESC
+    LIMIT 10
+  `
+});
+```
+
+```python Python
+from autumn import Autumn
+
+autumn = Autumn(api_key='your_api_key')
+
+result = autumn.insights.query(
+    query="""
+        SELECT 
+          event_name,
+          COUNT(*) as count
+        FROM events
+        WHERE timestamp >= NOW() - INTERVAL 7 DAY
+        GROUP BY event_name
+        ORDER BY count DESC
+        LIMIT 10
+    """
+)
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/autumn-js';
+
+const autumn = new Autumn({ apiKey: 'your_api_key' });
+
+const result = await autumn.insights.query({
+  query: `
+    SELECT 
+      event_name,
+      COUNT(*) as count
+    FROM events
+    WHERE timestamp >= NOW() - INTERVAL 7 DAY
+    GROUP BY event_name
+    ORDER BY count DESC
+    LIMIT 10
+  `
+});
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "data": {
+    "data": [
+      { "event_name": "api_call", "count": "15234" },
+      { "event_name": "file_upload", "count": "8912" },
+      { "event_name": "user_login", "count": "5678" },
+      { "event_name": "report_generated", "count": "3421" },
+      { "event_name": "export_data", "count": "2156" }
+    ]
+  }
+}
+```
+</ResponseExample>
+
+## Example Queries
+
+### Count Events by Customer
+
+```sql
+SELECT 
+  customer_id,
+  COUNT(*) as event_count
+FROM events
+WHERE timestamp >= NOW() - INTERVAL 30 DAY
+GROUP BY customer_id
+ORDER BY event_count DESC
+LIMIT 20
+```
+
+### Aggregate Usage by Feature
+
+```sql
+SELECT 
+  event_name,
+  SUM(
+    CASE
+      WHEN JSONHas(properties, 'value') 
+        THEN toInt64(JSONExtractFloat(properties, 'value'))
+      WHEN value IS NOT NULL 
+        THEN toInt64(value)
+      ELSE 1
+    END
+  ) AS total_usage
+FROM events
+WHERE timestamp >= NOW() - INTERVAL 7 DAY
+GROUP BY event_name
+ORDER BY total_usage DESC
+```
+
+### Events Over Time
+
+```sql
+SELECT 
+  toStartOfDay(timestamp) as date,
+  event_name,
+  COUNT(*) as count
+FROM events
+WHERE timestamp >= NOW() - INTERVAL 30 DAY
+GROUP BY date, event_name
+ORDER BY date DESC, count DESC
+```
+
+### Filter by Event Properties
+
+```sql
+SELECT 
+  customer_id,
+  COUNT(*) as premium_api_calls
+FROM events
+WHERE 
+  event_name = 'api_call'
+  AND JSONExtractString(properties, 'plan') = 'premium'
+  AND timestamp >= NOW() - INTERVAL 7 DAY
+GROUP BY customer_id
+ORDER BY premium_api_calls DESC
+```
+
+## Data Schema
+
+The `events` table includes the following columns:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | String | Unique event identifier |
+| `org_id` | String | Organization identifier |
+| `env` | String | Environment (production/development) |
+| `customer_id` | String | Customer who triggered the event |
+| `event_name` | String | Name/type of the event |
+| `timestamp` | DateTime | When the event occurred |
+| `value` | Nullable(Float64) | Numeric value associated with event |
+| `properties` | String (JSON) | Additional event metadata |
+
+## ClickHouse SQL Functions
+
+You can use standard ClickHouse SQL functions in your queries:
+
+- **Time functions**: `NOW()`, `toStartOfDay()`, `toStartOfHour()`, `INTERVAL`
+- **Aggregation**: `COUNT()`, `SUM()`, `AVG()`, `MIN()`, `MAX()`
+- **JSON**: `JSONExtractString()`, `JSONExtractFloat()`, `JSONHas()`
+- **String functions**: `LIKE`, `startsWith()`, `endsWith()`
+
+<Info>
+  Learn more about ClickHouse SQL syntax in the [ClickHouse documentation](https://clickhouse.com/docs/en/sql-reference).
+</Info>
+
+## Error Handling
+
+The endpoint returns a 400 error if:
+- The query references restricted virtual tables
+- The query syntax is invalid
+- The query exceeds execution time limits
+
+```json
+{
+  "data": null,
+  "error": "Virtual table not allowed in query"
+}
+```
+
+## Best Practices
+
+1. **Add time filters**: Always include timestamp filters to limit data scanned
+2. **Use LIMIT**: Add LIMIT clauses to prevent excessive result sets
+3. **Index columns**: Filter on indexed columns (customer_id, event_name, timestamp) for better performance
+4. **Test queries**: Test complex queries in a development environment first
+5. **Cache results**: Cache frequently-run query results on your application side
+
+## Related Endpoints
+
+- [Query Analytics](/api/analytics/query) - Simple analytics queries with predefined time ranges
+- [List Events](/api/events/list) - List raw event data
+- [Track Events](/api/core/track) - Track usage events

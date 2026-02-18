@@ -1,0 +1,673 @@
+---
+title: "Usage-Based Billing"
+description: "Implement metered billing and track customer usage in real-time"
+---
+
+## Overview
+
+Usage-based billing allows you to charge customers based on their actual consumption of your product. Autumn makes it easy to track usage, set limits, and handle overages automatically.
+
+## When to Use Usage-Based Billing
+
+- **API platforms**: Charge per API call or request
+- **AI/ML services**: Bill for compute time or tokens processed
+- **Media processing**: Charge per video transcoded or image processed
+- **Storage services**: Bill for GB stored or transferred
+- **Communication platforms**: Charge per SMS, email, or call minute
+
+## Setting Up a Usage-Based Feature
+
+<Steps>
+  <Step title="Create a feature for tracking">
+    First, create a feature that represents what you want to meter:
+
+    ```typescript
+    const feature = await fetch('https://api.useautumn.com/features', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        feature_id: 'api_calls',
+        name: 'API Calls',
+        type: 'metered'
+      })
+    });
+    ```
+  </Step>
+
+  <Step title="Configure usage pricing in your product">
+    Add the feature to your product with usage-based pricing:
+
+    ```typescript
+    {
+      "plan_id": "pro_plan",
+      "items": [
+        {
+          "feature_id": "api_calls",
+          "included": 10000,              // 10k calls included
+          "unlimited": false,
+          "reset": {
+            "interval": "month",          // Resets monthly
+            "interval_count": 1
+          },
+          "price": {
+            "amount": 50,                 // $0.50 per 1000 calls
+            "billing_units": 1000,
+            "billing_method": "per_unit",
+            "interval": "month"
+          }
+        }
+      ]
+    }
+    ```
+
+    **Key parameters**:
+    - `included`: Base allowance included in the plan
+    - `billing_units`: Granularity for billing (e.g., per 1000 units)
+    - `billing_method`: How to calculate charges (`per_unit` or `per_package`)
+    - `reset.interval`: When usage counters reset
+  </Step>
+
+  <Step title="Track usage events">
+    Use the `/track` endpoint whenever your customer consumes the feature:
+
+    ```typescript
+    const trackUsage = async (customerId: string, value: number) => {
+      const response = await fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: 'api_calls',
+          value: value,  // Number of API calls to track
+          properties: {
+            endpoint: req.path,
+            method: req.method,
+            timestamp: Date.now()
+          }
+        })
+      });
+
+      const data = await response.json();
+      return data.balance;
+    };
+    ```
+  </Step>
+
+  <Step title="Check usage before allowing access">
+    Optionally check if the customer has remaining balance:
+
+    ```typescript
+    const checkAccess = async (customerId: string) => {
+      const response = await fetch('https://api.useautumn.com/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: 'api_calls',
+          required_balance: 1  // Check if they have at least 1 call
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.allowed) {
+        throw new Error('Insufficient balance');
+      }
+      
+      return data;
+    };
+    ```
+  </Step>
+</Steps>
+
+## Usage Limits and Resets
+
+### Hard Limits
+
+Block usage when customers hit their limit:
+
+```typescript
+{
+  "feature_id": "api_calls",
+  "included": 10000,
+  "unlimited": false,
+  "price": null  // No overage pricing = hard limit
+}
+```
+
+When the customer reaches 10,000 calls:
+- `/check` returns `allowed: false`
+- `/track` with `overage_behavior: "reject"` will fail
+- Customer must upgrade or wait for reset
+
+### Soft Limits with Overages
+
+Allow usage beyond the limit but charge for it:
+
+```typescript
+{
+  "feature_id": "api_calls",
+  "included": 10000,
+  "unlimited": false,
+  "price": {
+    "amount": 100,           // $1.00 per 1000 overage calls
+    "billing_units": 1000,
+    "billing_method": "per_unit"
+  }
+}
+```
+
+**Billing example**:
+- Customer has 10,000 included calls
+- Uses 15,500 calls total
+- Overage: 5,500 calls
+- Rounds to 6 billing units (6 × 1000)
+- Charge: 6 × $1.00 = $6.00
+
+### Reset Intervals
+
+Configure when usage counters reset:
+
+<CodeGroup>
+
+```typescript Monthly Reset
+{
+  "reset": {
+    "interval": "month",
+    "interval_count": 1
+  }
+}
+// Resets on the 1st of each month
+```
+
+```typescript Weekly Reset
+{
+  "reset": {
+    "interval": "week",
+    "interval_count": 1
+  }
+}
+// Resets every Monday
+```
+
+```typescript Daily Reset
+{
+  "reset": {
+    "interval": "day",
+    "interval_count": 1
+  }
+}
+// Resets every day at midnight UTC
+```
+
+```typescript Custom Interval
+{
+  "reset": {
+    "interval": "day",
+    "interval_count": 7  // Every 7 days
+  }
+}
+```
+
+```typescript No Reset
+{
+  "reset": null
+}
+// Usage never resets (pay-as-you-go)
+```
+
+</CodeGroup>
+
+## Overage Handling
+
+### Overage Behavior Options
+
+Control what happens when a customer exceeds their balance:
+
+```typescript
+// Cap usage at available balance
+await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    value: 100,
+    overage_behavior: 'cap'  // Only deduct available balance
+  })
+});
+
+// Reject if insufficient balance
+await fetch('https://api.useautumn.com/track', {
+  method: 'POST',
+  body: JSON.stringify({
+    customer_id: 'cus_123',
+    feature_id: 'api_calls',
+    value: 100,
+    overage_behavior: 'reject'  // Fail if balance insufficient
+  })
+});
+```
+
+### Tiered Overage Pricing
+
+Charge different rates at different usage levels:
+
+```typescript
+{
+  "feature_id": "api_calls",
+  "included": 10000,
+  "price": {
+    "tiers": [
+      { "to": 10000, "amount": 0 },        // First 10k: free (included)
+      { "to": 50000, "amount": 50 },       // 10k-50k: $0.50 per 1k
+      { "to": 100000, "amount": 30 },      // 50k-100k: $0.30 per 1k
+      { "to": "inf", "amount": 10 }        // 100k+: $0.10 per 1k
+    ],
+    "billing_units": 1000,
+    "billing_method": "per_unit"
+  }
+}
+```
+
+**Billing example** for 75,000 API calls:
+- Tier 1 (0-10,000): $0 (included)
+- Tier 2 (10,001-50,000): 40 units × $0.50 = $20.00
+- Tier 3 (50,001-75,000): 25 units × $0.30 = $7.50
+- **Total overage charge**: $27.50
+
+## Real-Time Usage Tracking
+
+### Middleware Pattern
+
+Track usage automatically in your API middleware:
+
+```typescript
+import express from 'express';
+
+const usageTrackingMiddleware = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const customerId = req.user?.id;
+  
+  if (!customerId) {
+    return next();
+  }
+
+  try {
+    // Check if customer has access
+    const checkResponse = await fetch('https://api.useautumn.com/check', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'api_calls',
+        required_balance: 1
+      })
+    });
+
+    const checkData = await checkResponse.json();
+
+    if (!checkData.allowed) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        message: 'Please upgrade your plan or wait for usage reset',
+        reset_at: checkData.balance?.reset?.resets_at
+      });
+    }
+
+    // Track the usage
+    const trackResponse = await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'api_calls',
+        value: 1,
+        properties: {
+          endpoint: req.path,
+          method: req.method,
+          ip: req.ip
+        }
+      })
+    });
+
+    const trackData = await trackResponse.json();
+
+    // Add usage info to response headers
+    res.setHeader('X-RateLimit-Remaining', trackData.balance?.current_balance || 0);
+    res.setHeader('X-RateLimit-Reset', trackData.balance?.reset?.resets_at || '');
+
+    next();
+  } catch (error) {
+    console.error('Usage tracking error:', error);
+    // Fail open - allow request even if tracking fails
+    next();
+  }
+};
+
+app.use('/api', usageTrackingMiddleware);
+```
+
+### Batch Tracking
+
+Track multiple usage events efficiently:
+
+```typescript
+const batchTrackUsage = async (customerId: string, events: Array<{
+  featureId: string;
+  value: number;
+  properties?: Record<string, any>;
+}>) => {
+  // Track all events in parallel
+  const results = await Promise.all(
+    events.map(event =>
+      fetch('https://api.useautumn.com/track', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: event.featureId,
+          value: event.value,
+          properties: event.properties,
+          idempotency_key: `${customerId}-${event.featureId}-${Date.now()}`
+        })
+      }).then(r => r.json())
+    )
+  );
+
+  return results;
+};
+
+// Usage
+await batchTrackUsage('cus_123', [
+  { featureId: 'api_calls', value: 1 },
+  { featureId: 'compute_minutes', value: 5 },
+  { featureId: 'storage_gb', value: 0.5 }
+]);
+```
+
+## Idempotent Tracking
+
+Prevent duplicate tracking with idempotency keys:
+
+```typescript
+const trackWithRetry = async (customerId: string, featureId: string, value: number) => {
+  const idempotencyKey = `${customerId}-${featureId}-${Date.now()}-${Math.random()}`;
+  
+  const makeRequest = async () => {
+    return fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AUTUMN_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: featureId,
+        value: value,
+        idempotency_key: idempotencyKey  // Same key on retry
+      })
+    });
+  };
+
+  // Retry logic with same idempotency key
+  let attempts = 0;
+  while (attempts < 3) {
+    try {
+      const response = await makeRequest();
+      if (response.ok) {
+        return await response.json();
+      }
+      if (response.status >= 500) {
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        continue;
+      }
+      throw new Error(`Tracking failed: ${response.status}`);
+    } catch (error) {
+      attempts++;
+      if (attempts >= 3) throw error;
+    }
+  }
+};
+```
+
+## Displaying Usage to Customers
+
+Show customers their current usage and limits:
+
+```typescript
+import React, { useEffect, useState } from 'react';
+
+interface UsageData {
+  feature_id: string;
+  current_balance: number;
+  granted_balance: number;
+  usage: number;
+  unlimited: boolean;
+  reset: {
+    interval: string;
+    resets_at: number;
+  } | null;
+}
+
+const UsageDisplay: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const [usage, setUsage] = useState<UsageData | null>(null);
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      const response = await fetch('/api/usage', {
+        method: 'POST',
+        body: JSON.stringify({
+          customer_id: customerId,
+          feature_id: 'api_calls'
+        })
+      });
+      const data = await response.json();
+      setUsage(data.balance);
+    };
+
+    fetchUsage();
+    const interval = setInterval(fetchUsage, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [customerId]);
+
+  if (!usage) return <div>Loading...</div>;
+  if (usage.unlimited) return <div>Unlimited usage</div>;
+
+  const percentUsed = (usage.usage / usage.granted_balance) * 100;
+  const resetDate = usage.reset?.resets_at 
+    ? new Date(usage.reset.resets_at).toLocaleDateString()
+    : 'Never';
+
+  return (
+    <div className="usage-card">
+      <h3>API Calls</h3>
+      <div className="usage-bar">
+        <div 
+          className="usage-fill" 
+          style={{ width: `${percentUsed}%` }}
+        />
+      </div>
+      <p>
+        {usage.current_balance.toLocaleString()} / {usage.granted_balance.toLocaleString()} remaining
+      </p>
+      <p className="text-sm text-gray-500">
+        Resets: {resetDate}
+      </p>
+      {percentUsed > 80 && (
+        <button onClick={() => window.location.href = '/upgrade'}>
+          Upgrade Plan
+        </button>
+      )}
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+<Note>
+  **Track usage as close to consumption as possible** to ensure accurate billing and prevent race conditions.
+</Note>
+
+<Tip>
+  Use idempotency keys for all tracking requests to safely handle retries and network failures.
+</Tip>
+
+<Warning>
+  Always handle tracking failures gracefully - don't block your user's experience if usage tracking fails.
+</Warning>
+
+### Performance Optimization
+
+1. **Track asynchronously**: Don't block API responses waiting for tracking
+2. **Batch when possible**: Group multiple tracking events
+3. **Cache balance checks**: Check usage every N requests, not every request
+4. **Use event names**: Track one event that affects multiple features
+
+### Customer Experience
+
+1. **Show usage proactively**: Display current usage in your UI
+2. **Warn before limits**: Alert at 80% and 90% of usage
+3. **Explain charges**: Make overage costs clear before they occur
+4. **Provide upgrade paths**: Make it easy to increase limits
+
+## Common Patterns
+
+### API Rate Limiting
+
+```typescript
+const rateLimitCheck = async (customerId: string) => {
+  const response = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'api_calls',
+      send_event: true,  // Check and track in one call
+      required_balance: 1
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (!data.allowed) {
+    throw { 
+      status: 429, 
+      message: 'Rate limit exceeded',
+      retryAfter: data.balance?.reset?.resets_at 
+    };
+  }
+  
+  return data;
+};
+```
+
+### Compute Time Billing
+
+```typescript
+const trackComputeTime = async (customerId: string, jobId: string) => {
+  const startTime = Date.now();
+  
+  try {
+    // Run the job
+    await processJob(jobId);
+  } finally {
+    // Always track time, even if job fails
+    const durationSeconds = Math.ceil((Date.now() - startTime) / 1000);
+    
+    await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'compute_seconds',
+        value: durationSeconds,
+        properties: {
+          job_id: jobId,
+          duration: durationSeconds
+        }
+      })
+    });
+  }
+};
+```
+
+### Storage-Based Billing
+
+```typescript
+const updateStorageUsage = async (customerId: string) => {
+  // Calculate total storage used
+  const totalGB = await calculateCustomerStorage(customerId);
+  
+  // Get current tracked usage
+  const checkResponse = await fetch('https://api.useautumn.com/check', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer_id: customerId,
+      feature_id: 'storage_gb'
+    })
+  });
+  const { balance } = await checkResponse.json();
+  
+  // Calculate delta
+  const currentUsage = balance.usage || 0;
+  const delta = totalGB - currentUsage;
+  
+  // Track the delta
+  if (delta !== 0) {
+    await fetch('https://api.useautumn.com/track', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id: customerId,
+        feature_id: 'storage_gb',
+        value: delta  // Can be positive or negative
+      })
+    });
+  }
+};
+
+// Run daily
+setInterval(() => {
+  updateStorageUsage('cus_123');
+}, 24 * 60 * 60 * 1000);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Metering Usage" icon="gauge" href="/guides/metering-usage">
+    Learn advanced metering patterns
+  </Card>
+  
+  <Card title="Track API Reference" icon="code" href="/api/core/track">
+    Complete API documentation
+  </Card>
+  
+  <Card title="Credit Systems" icon="coins" href="/guides/credit-systems">
+    Implement credit-based billing
+  </Card>
+  
+  <Card title="Custom Pricing" icon="dollar-sign" href="/guides/custom-pricing">
+    Create custom enterprise plans
+  </Card>
+</CardGroup>

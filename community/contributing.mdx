@@ -1,0 +1,476 @@
+---
+title: 'Contributing'
+description: 'Learn how to contribute to Autumn'
+---
+
+## Overview
+
+Thank you for your interest in contributing to Autumn! We welcome contributions of all kinds - from bug fixes and documentation improvements to new features and architectural enhancements.
+
+<Note>
+  Whether you're fixing a typo or building a major feature, all contributions are valuable and appreciated.
+</Note>
+
+## Getting Started
+
+Before you start contributing, familiarize yourself with Autumn:
+
+<Steps>
+  <Step title="Explore the Codebase">
+    Clone the repository and explore the project structure. Autumn is a monorepo with three main packages: `server`, `vite`, and `shared`.
+  </Step>
+  
+  <Step title="Set Up Locally">
+    Follow the installation guide below to get Autumn running on your machine.
+  </Step>
+  
+  <Step title="Find an Issue">
+    Check our [GitHub issues](https://github.com/useautumn/autumn/issues) for bugs, feature requests, or areas marked "good first issue".
+  </Step>
+</Steps>
+
+---
+
+## Installation Guide
+
+### Requirements
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node">
+    Required for running JavaScript/TypeScript
+  </Card>
+  <Card title="Bun" icon="javascript">
+    Package manager and runtime used throughout Autumn
+  </Card>
+</CardGroup>
+
+### Quickstart Setup
+
+Use this guide to get Autumn running quickly with our automated setup script:
+
+<Steps>
+  <Step title="Fork and Clone">
+    1. Click the 'Fork' button at the top right of the [Autumn repository](https://github.com/useautumn/autumn)
+    2. Clone your fork locally:
+    
+    ```bash
+    git clone https://github.com/YOUR-USERNAME/autumn.git
+    cd autumn
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    ```bash
+    bun install
+    ```
+  </Step>
+
+  <Step title="Run Setup Script">
+    The setup script generates required environment variables and helps you set up a database:
+    
+    ```bash
+    bun run setup
+    ```
+    
+    The setup script:
+    - Auto-spins up a Supabase database and creates required tables (optional)
+    - Generates a localtunnel reserved key for receiving Stripe webhooks in development
+  </Step>
+
+  <Step title="Start Development Environment">
+    ```bash
+    # On Windows
+    docker compose -f docker-compose.dev.yml up
+    
+    # On Mac/Linux
+    docker compose -f docker-compose.unix.yml up
+    ```
+    
+    You should now see the Autumn dashboard at `http://localhost:3000`.
+  </Step>
+</Steps>
+
+<Note>
+  To log in, enter an email at the sign-in page. An OTP will appear in your console/terminal. In production, Autumn uses Resend for email or Google OAuth - these can be configured in `server/.env`.
+</Note>
+
+### Manual Setup
+
+Prefer to configure your own database or tunneling solution (ngrok, cloudflared)? Use the manual setup:
+
+<Steps>
+  <Step title="Configure Environment">
+    1. Copy `server/.env.example` to `server/.env`
+    2. Copy `vite/.env.example` to `vite/.env`
+    3. Fill in your environment variables (database URL, Stripe keys, etc.)
+  </Step>
+
+  <Step title="Start Docker">
+    ```bash
+    # On Windows
+    docker compose -f docker-compose.dev.yml up
+    
+    # On Mac/Linux
+    docker compose -f docker-compose.unix.yml up
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Database Management
+
+Autumn uses **PostgreSQL** with **Drizzle ORM** for database management.
+
+### Setting Up the Database
+
+You can use any PostgreSQL hosting solution. Our cloud offering uses Supabase, but you're free to use any provider.
+
+<Warning>
+  The Docker Compose files don't spin up a database automatically. You'll need to provide your own PostgreSQL instance.
+</Warning>
+
+### Creating Database Tables
+
+Make sure the `DATABASE_URL` environment variable is set in `server/.env`:
+
+```bash
+DATABASE_URL=postgresql://user:password@host:5432/database
+```
+
+Then generate the required tables:
+
+```bash
+bun run db:push
+```
+
+### Handling Migrations
+
+When creating version-controlled migrations for new releases:
+
+<Steps>
+  <Step title="Generate Migration Files">
+    ```bash
+    bun run db:generate
+    ```
+    
+    This creates migration files based on schema changes.
+  </Step>
+
+  <Step title="Apply Migrations">
+    ```bash
+    bun run db:migrate
+    ```
+    
+    This applies pending migrations to your database.
+  </Step>
+</Steps>
+
+### Troubleshooting Database Issues
+
+<Accordion title="SyntaxError: Unexpected end of JSON input">
+  If you encounter this error when running `bun setup` again after previously running it, you may need to clear your database tables. This is a [known Drizzle issue](https://github.com/drizzle-team/drizzle-orm/issues/4529).
+  
+  To resolve:
+  1. Connect to your database
+  2. Drop all existing tables
+  3. Run the setup script again
+</Accordion>
+
+---
+
+## Contribution Workflow
+
+<Steps>
+  <Step title="Create a Branch">
+    Create a new branch for your changes:
+    
+    ```bash
+    git checkout -b feature/your-feature-name
+    # or
+    git checkout -b fix/your-bug-fix
+    ```
+  </Step>
+
+  <Step title="Make Your Changes">
+    Implement your changes following the [code style guidelines](#code-style-guidelines) below.
+  </Step>
+
+  <Step title="Commit Your Changes">
+    Write clear, descriptive commit messages. You can use [commitizen](https://www.npmjs.com/package/commitizen) to help:
+    
+    ```bash
+    git commit -m "docs: added new code snippet to concepts.md"
+    # or
+    git commit -m "fix: fixed rounding error on priceUtils.ts"
+    ```
+    
+    **Commit Message Format:**
+    - `feat:` New feature
+    - `fix:` Bug fix
+    - `docs:` Documentation changes
+    - `refactor:` Code refactoring
+    - `test:` Adding tests
+    - `chore:` Maintenance tasks
+  </Step>
+
+  <Step title="Sync with Upstream">
+    Fetch the latest changes and merge with your branch:
+    
+    ```bash
+    git fetch upstream/staging
+    git merge upstream/staging
+    ```
+  </Step>
+
+  <Step title="Push to Your Fork">
+    ```bash
+    git push origin your-branch-name
+    ```
+  </Step>
+
+  <Step title="Submit a Pull Request">
+    1. Go to your fork on GitHub
+    2. Click "New Pull Request"
+    3. Target the `staging` branch (not `main`)
+    4. Fill out the PR template completely
+    5. Link any relevant issues
+    6. Add screenshots for UI changes
+  </Step>
+</Steps>
+
+<Warning>
+  Always submit pull requests to the `staging` branch, not `main`.
+</Warning>
+
+---
+
+## Code Style Guidelines
+
+Autumn uses **Biome** for linting and formatting:
+
+### Running the Linter
+
+```bash
+# Check a specific file or folder
+bunx biome check server/src/internal
+
+# Auto-fix issues
+bunx biome check --write server/src/internal
+```
+
+<Note>
+  Always specify a folder path to avoid out-of-scope errors. The codebase is large, so checking everything at once may fail.
+</Note>
+
+### Type Checking
+
+Biome doesn't perform type checking. Use TypeScript's compiler:
+
+```bash
+tsc --noEmit --skipLibCheck path/to/file.ts
+```
+
+### Key Conventions
+
+<AccordionGroup>
+  <Accordion title="Object Parameters" icon="brackets-curly">
+    Functions should always take object parameters (not positional arguments):
+    
+    ```typescript
+    // Good
+    const doSomething = async ({ ctx, customerId }: { 
+      ctx: AutumnContext; 
+      customerId: string 
+    }) => { ... }
+    
+    // Bad
+    const doSomething = async (ctx: AutumnContext, customerId: string) => { ... }
+    ```
+    
+    This makes parameters named and easy to reorder.
+  </Accordion>
+
+  <Accordion title="Import from zod/v4" icon="import">
+    Always import Zod from `zod/v4`, not `zod` directly:
+    
+    ```typescript
+    import { z } from "zod/v4";
+    ```
+  </Accordion>
+
+  <Accordion title="Guard Clauses" icon="shield">
+    Prefer early returns over nested if statements:
+    
+    ```typescript
+    // Good
+    if (!admin) return;
+    doAdminThing();
+    
+    // Bad
+    if (admin) {
+      doAdminThing();
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="No TODO Comments" icon="ban">
+    Never leave TODO comments. If you've been told to do something, complete it. If it's out of scope, create a GitHub issue instead.
+  </Accordion>
+
+  <Accordion title="File Naming" icon="file">
+    Don't use single-word file names like `index.ts` or `model.ts`. Use descriptive names:
+    
+    - `orgUtils.ts` (not `utils.ts`)
+    - `customerService.ts` (not `service.ts`)
+    
+    Keep filenames under three words.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Testing
+
+When writing tests, always read the test guides first:
+
+1. **General guide:** `server/tests/_guides/general-test-guide.md`
+2. **Case-specific guides:** Check for endpoint-specific guides (e.g., `check-endpoint-tests.md`)
+
+<Note>
+  When running tests, server-side console logs go to the server's logs, not the test output. Ask for logs if you need to debug.
+</Note>
+
+### Running Tests
+
+```bash
+# Integration tests
+bun run test:integration
+
+# Specific test file
+cd server && bun test path/to/test.ts
+```
+
+---
+
+## Areas to Contribute
+
+<CardGroup cols={2}>
+  <Card title="Bug Fixes" icon="bug">
+    Fix reported issues or bugs you discover while using Autumn.
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Improve docs, add examples, or fix typos. Documentation is always appreciated!
+  </Card>
+  
+  <Card title="Features" icon="sparkles">
+    Build new features or enhance existing ones. Discuss major changes first in GitHub discussions.
+  </Card>
+  
+  <Card title="Tests" icon="flask">
+    Add test coverage for untested code or edge cases.
+  </Card>
+</CardGroup>
+
+---
+
+## Pull Request Guidelines
+
+<Steps>
+  <Step title="Fill Out the Template">
+    Complete the entire PR template. Include:
+    - Description of changes
+    - Related issues
+    - Screenshots (for UI changes)
+    - Testing steps
+  </Step>
+
+  <Step title="Keep PRs Focused">
+    One PR should address one issue or feature. Split large changes into multiple PRs.
+  </Step>
+
+  <Step title="Write Tests">
+    Add tests for new features and bug fixes.
+  </Step>
+
+  <Step title="Update Documentation">
+    Update relevant documentation for your changes.
+  </Step>
+</Steps>
+
+---
+
+## Code Review Process
+
+After submitting your PR:
+
+1. **Automated checks** run (linting, type checking, tests)
+2. **Team review** - A maintainer will review your code
+3. **Feedback** - Address any requested changes
+4. **Approval** - Once approved, your PR will be merged into staging
+5. **Release** - Changes in staging are periodically released to production
+
+<Note>
+  We aim to review all PRs within 48 hours. If you haven't heard back, feel free to ping us on Discord.
+</Note>
+
+---
+
+## Community Guidelines
+
+<CardGroup cols={2}>
+  <Card title="Be Respectful" icon="heart">
+    Treat all contributors with respect and kindness.
+  </Card>
+  
+  <Card title="Be Patient" icon="clock">
+    Maintainers are often volunteers. Reviews may take time.
+  </Card>
+  
+  <Card title="Be Collaborative" icon="users">
+    Work together to find the best solutions.
+  </Card>
+  
+  <Card title="Be Open" icon="comment">
+    Share your ideas and be open to feedback.
+  </Card>
+</CardGroup>
+
+---
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/STqxY92zuS">
+    Join our Discord community for real-time help
+  </Card>
+  
+  <Card title="GitHub Discussions" icon="github" href="https://github.com/useautumn/autumn/discussions">
+    Ask questions and share ideas
+  </Card>
+  
+  <Card title="Email" icon="envelope" href="mailto:hey@useautumn.com">
+    Contact us at hey@useautumn.com
+  </Card>
+  
+  <Card title="Documentation" icon="book" href="/">
+    Check our comprehensive docs
+  </Card>
+</CardGroup>
+
+---
+
+## Recognition
+
+All contributors are recognized in our:
+
+- **Contributors graph** on GitHub
+- **Release notes** for significant contributions
+- **README** with your avatar
+
+Thank you for making Autumn better!
+
+<a href="https://github.com/useautumn/autumn/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=useautumn/autumn" />
+</a>

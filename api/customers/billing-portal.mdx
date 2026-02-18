@@ -1,0 +1,185 @@
+---
+title: 'Get Billing Portal'
+api: 'GET /customers/{customer_id}/billing-portal'
+---
+
+Generates a Stripe billing portal session URL for a customer. The billing portal allows customers to manage their subscriptions, payment methods, view invoices, and update billing information through a Stripe-hosted interface.
+
+## Authentication
+
+Requires a valid API key passed in the `Authorization` header as a Bearer token.
+
+```bash
+Authorization: Bearer YOUR_API_KEY
+```
+
+## Path Parameters
+
+<ParamField path="customer_id" type="string" required>
+  The unique identifier of the customer
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="return_url" type="string" optional>
+  URL to redirect to when the customer clicks the back button in the billing portal. If not provided, defaults to your organization's success URL configured in Autumn.
+</ParamField>
+
+## Response
+
+Returns a billing portal session object with the URL to redirect the customer to.
+
+<ResponseField name="customer_id" type="string">
+  The customer's unique identifier
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The URL to the Stripe billing portal. Redirect your customer to this URL. The session is temporary and expires after a short period.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://api.autumnai.com/customers/user_12345/billing-portal" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```bash cURL (with return URL)
+curl -X GET "https://api.autumnai.com/customers/user_12345/billing-portal?return_url=https://myapp.com/settings/billing" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```typescript TypeScript
+import { Autumn } from '@useautumn/sdk';
+
+const autumn = new Autumn({
+  apiKey: process.env.AUTUMN_API_KEY
+});
+
+// Generate billing portal URL
+const portal = await autumn.customers.getBillingPortal('user_12345', {
+  return_url: 'https://myapp.com/settings/billing'
+});
+
+// Redirect user to the portal
+window.location.href = portal.url;
+```
+
+```typescript TypeScript (Express.js)
+import express from 'express';
+import { Autumn } from '@useautumn/sdk';
+
+const app = express();
+const autumn = new Autumn({
+  apiKey: process.env.AUTUMN_API_KEY
+});
+
+app.get('/billing-portal', async (req, res) => {
+  const customerId = req.user.id;
+  
+  const portal = await autumn.customers.getBillingPortal(customerId, {
+    return_url: 'https://myapp.com/settings/billing'
+  });
+  
+  // Redirect to Stripe billing portal
+  res.redirect(portal.url);
+});
+```
+
+```python Python
+from autumn import Autumn
+from flask import redirect
+
+autumn = Autumn(api_key=os.environ.get('AUTUMN_API_KEY'))
+
+@app.route('/billing-portal')
+def billing_portal():
+  customer_id = current_user.id
+  
+  portal = autumn.customers.get_billing_portal(
+    customer_id,
+    return_url='https://myapp.com/settings/billing'
+  )
+  
+  # Redirect to Stripe billing portal
+  return redirect(portal['url'])
+```
+
+```python Python (Django)
+from autumn import Autumn
+from django.shortcuts import redirect
+import os
+
+autumn = Autumn(api_key=os.environ.get('AUTUMN_API_KEY'))
+
+def billing_portal(request):
+  customer_id = request.user.customer_id
+  
+  portal = autumn.customers.get_billing_portal(
+    customer_id,
+    return_url='https://myapp.com/settings/billing'
+  )
+  
+  return redirect(portal['url'])
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "customer_id": "user_12345",
+  "url": "https://billing.stripe.com/session/live_abcdefghijklmnop1234567890"
+}
+```
+
+```json 404 Not Found
+{
+  "error": {
+    "code": "not_found",
+    "message": "Customer user_12345 not found"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid API key"
+  }
+}
+```
+
+</ResponseExample>
+
+## What customers can do in the billing portal
+
+The Stripe billing portal allows customers to:
+
+- **Update payment methods** - Add, remove, or set a default payment method
+- **View invoices** - Access all past invoices and receipts
+- **Update billing information** - Change billing address and tax information
+- **Manage subscriptions** - View active subscriptions (upgrade/downgrade if configured)
+- **Cancel subscriptions** - Cancel their subscription (if enabled in your Stripe settings)
+- **View usage** - See metered billing usage for usage-based pricing
+
+## Configuration
+
+The billing portal's appearance and capabilities are configured in your Stripe Dashboard under **Settings > Billing > Customer portal**. You can customize:
+
+- Which features are enabled (payment methods, invoices, subscriptions, etc.)
+- Branding (colors, logo)
+- Terms of service and privacy policy links
+- Allowed subscription changes
+- Cancellation flows
+
+## Notes
+
+- The portal URL is a single-use session that expires after a short period (typically 24 hours)
+- If the customer doesn't exist in Stripe yet, Autumn will automatically create them
+- The `return_url` must be an absolute URL (include the protocol: `https://`)
+- Portal sessions are not stored - generate a new URL each time the customer needs access
+- All billing portal activity is logged in Stripe and can trigger webhooks
+- The billing portal is fully hosted by Stripe and complies with PCI requirements

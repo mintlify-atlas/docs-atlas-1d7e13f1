@@ -1,80 +1,340 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get started with Autumn in minutes - choose cloud or self-hosted"
 ---
 
-## Get started in three steps
+## Choose your path
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+Autumn offers two ways to get started. Choose the option that best fits your needs:
 
 <CardGroup cols={2}>
+  <Card title="Cloud" icon="cloud" href="https://app.useautumn.com">
+    **Recommended for most users**
+    
+    Get started immediately with our hosted service. No infrastructure setup required.
+  </Card>
+  <Card title="Self-Hosted" icon="server" href="/self-hosting">
+    **For full control**
+    
+    Deploy Autumn on your own infrastructure. See the [self-hosting guide](/self-hosting) for details.
+  </Card>
+</CardGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Getting Started with Cloud
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+<Steps>
+  <Step title="Sign up for Autumn">
+    Create your account at [app.useautumn.com](https://app.useautumn.com)
+  </Step>
+  
+  <Step title="Create your first product">
+    In the dashboard, create a product and define your pricing:
+    - Set base subscription price
+    - Add features with limits
+    - Configure billing intervals
+  </Step>
+  
+  <Step title="Get your API key">
+    Navigate to **Settings** → **API Keys** and create a secret key. Add it to your environment:
+    
+    ```bash .env
+    AUTUMN_SECRET_KEY=am_sk_test_xxxxx
+    ```
+  </Step>
+  
+  <Step title="Install the SDK">
+    Choose your preferred package manager:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install autumn-js
+    ```
+    
+    ```bash bun
+    bun add autumn-js
+    ```
+    
+    ```bash pnpm
+    pnpm add autumn-js
+    ```
+    
+    ```bash yarn
+    yarn add autumn-js
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+## Integration Guide
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Autumn provides framework-specific handlers for seamless integration:
 
+<Tabs>
+  <Tab title="Next.js">
+    ### Next.js App Router
+    
+    Create an API route handler:
+    
+    ```typescript app/api/autumn/[...all]/route.ts
+    import { autumnHandler } from "autumn-js/next";
+    
+    export const { GET, POST } = autumnHandler({
+      identify: async (request) => {
+        // Get user/org from your auth provider
+        const session = await auth.api.getSession({ 
+          headers: request.headers 
+        });
+        
+        return {
+          customerId: session?.user.id,
+          customerData: {
+            name: session?.user.name,
+            email: session?.user.email,
+          },
+        };
+      },
+    });
+    ```
+    
+    Add the provider to your layout:
+    
+    ```tsx app/layout.tsx
+    import { AutumnProvider } from "autumn-js/react";
+    
+    export default function RootLayout({ children }) {
+      return (
+        <html>
+          <body>
+            <AutumnProvider>
+              {children}
+            </AutumnProvider>
+          </body>
+        </html>
+      );
+    }
+    ```
+  </Tab>
+  
+  <Tab title="React Router">
+    ### React Router Setup
+    
+    Create the Autumn route:
+    
+    ```typescript app/routes/api.autumn.tsx
+    import { autumnHandler } from "autumn-js/react-router";
+    
+    export const { loader, action } = autumnHandler({
+      identify: async (args) => {
+        const session = await auth.api.getSession({ 
+          headers: args.request.headers 
+        });
+        
+        return {
+          customerId: session?.user.id,
+          customerData: { 
+            name: session?.user.name, 
+            email: session?.user.email 
+          },
+        };
+      },
+    });
+    ```
+    
+    Add to routes.ts:
+    
+    ```typescript routes.ts
+    route("api/autumn/*", "routes/api.autumn.tsx")
+    ```
+    
+    Wrap your app with the provider:
+    
+    ```tsx app/root.tsx
+    import { AutumnProvider } from "autumn-js/react";
+    
+    export default function App() {
+      return (
+        <AutumnProvider>
+          <Outlet />
+        </AutumnProvider>
+      );
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Express">
+    ### Express Setup
+    
+    ```typescript server.js
+    import express from "express";
+    import { autumnHandler } from "autumn-js/express";
+    
+    const app = express();
+    
+    app.use(express.json()); // Must be before autumnHandler
+    
+    app.use("/api/autumn", autumnHandler({
+      identify: async (req) => {
+        const session = await auth.api.getSession({ 
+          headers: fromNodeHeaders(req.headers) 
+        });
+        
+        return {
+          customerId: session?.user.id,
+          customerData: { 
+            name: session?.user.name, 
+            email: session?.user.email 
+          },
+        };
+      },
+    }));
+    ```
+    
+    For React frontend, add the provider:
+    
+    ```tsx
+    import { AutumnProvider } from "autumn-js/react";
+    
+    // If backend is on different URL
+    <AutumnProvider backendUrl={process.env.BACKEND_URL}>
+      <App />
+    </AutumnProvider>
+    ```
+  </Tab>
+  
+  <Tab title="Backend Only">
+    ### Backend Only Setup
+    
+    For server-side only implementations:
+    
+    <CodeGroup>
+    ```typescript Node.js
+    import { Autumn } from "autumn-js";
+    
+    const autumn = new Autumn({
+      secretKey: process.env.AUTUMN_SECRET_KEY,
+    });
+    
+    // Create or get customer
+    const { data } = await autumn.customers.create({
+      id: "user_123",
+      name: "John Doe",
+      email: "john@example.com",
+    });
+    ```
+    
+    ```python Python
+    from autumn import Autumn
+    
+    autumn = Autumn('am_sk_test_xxx')
+    
+    # Create or get customer
+    customer = await autumn.customers.create(
+        id="user_123",
+        name="John Doe",
+        email="john@example.com"
+    )
+    ```
+    
+    ```bash cURL
+    curl -X POST https://api.useautumn.com/customers \
+      -H "Authorization: Bearer am_sk_test_xxx" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "id": "user_123",
+        "name": "John Doe",
+        "email": "john@example.com"
+      }'
+    ```
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Using the Core Functions
+
+Once integrated, use Autumn's three core functions:
+
+### Check Access
+
+Check if a customer can access a feature:
+
+```typescript
+const { check } = useAutumn();
+
+const { data } = await check({ featureId: "ai_tokens" });
+
+if (!data.allowed) {
+  alert("AI limit reached - upgrade to continue");
+}
+```
+
+### Attach Plans
+
+Handle purchases and plan changes:
+
+```tsx
+const { attach } = useAutumn();
+
+<button
+  onClick={async () => {
+    await attach({ productId: "pro" });
+  }}
+>
+  Upgrade to Pro
+</button>
+```
+
+### Track Usage
+
+Record usage events:
+
+```typescript
+const { track } = useAutumn();
+
+const response = await generateAI();
+
+await track({
+  featureId: "ai_tokens",
+  value: response.tokensUsed
+});
+```
+
+## Verify Integration
+
+<Steps>
+  <Step title="Check customer creation">
+    Run your app and log in. The Autumn customer should be automatically created.
+  </Step>
+  
+  <Step title="View in dashboard">
+    Open your [Autumn dashboard](https://app.useautumn.com) and verify the customer appears in the **Customers** section.
+  </Step>
+  
+  <Step title="Test a purchase">
+    Click an upgrade button to test the checkout flow (use Stripe test mode).
+  </Step>
+</Steps>
+
+<Check>
+  **Success!** You've integrated Autumn into your application.
+</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/concepts/products-and-plans">
+    Learn about products, plans, and features
+  </Card>
+  <Card title="Usage-Based Billing" icon="chart-line" href="/guides/usage-based-billing">
+    Set up metering and usage limits
+  </Card>
+  <Card title="Credit Systems" icon="coins" href="/guides/credit-systems">
+    Build credit-based pricing models
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore the complete API
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Need help?** Join our [Discord community](https://discord.gg/53emPtY9tA) or email [hey@useautumn.com](mailto:hey@useautumn.com)
 </Note>
