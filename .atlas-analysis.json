@@ -1,11 +1,11 @@
 {
   "projectType": "api-service",
   "projectName": "Autumn",
-  "projectDescription": "Open-source pricing and billing platform that layers between Stripe and your application",
-  "theme": "palm",
-  "primaryColor": "#FF6B35",
-  "lightColor": "#FFB4A2",
-  "darkColor": "#C44D26",
+  "projectDescription": "Open-source pricing and billing platform that sits between Stripe and your application, enabling any pricing model with a simple API.",
+  "theme": "aspen",
+  "primaryColor": "#d97706",
+  "lightColor": "#f59e0b",
+  "darkColor": "#b45309",
   "navigation": {
     "tabs": [
       {
@@ -16,48 +16,57 @@
             "pages": [
               "introduction",
               "quickstart",
-              "installation"
+              "self-hosting"
             ]
           },
           {
             "group": "Core Concepts",
             "pages": [
+              "concepts/overview",
               "concepts/products-and-plans",
-              "concepts/features-and-entitlements",
+              "concepts/features",
               "concepts/customers",
-              "concepts/pricing-models",
-              "concepts/usage-tracking"
+              "concepts/entities"
             ]
           },
           {
-            "group": "Guides",
+            "group": "Pricing Models",
             "pages": [
-              "guides/authentication",
-              "guides/attach-products",
-              "guides/check-access",
-              "guides/track-usage",
-              "guides/manage-subscriptions",
-              "guides/webhooks",
-              "guides/testing"
+              "pricing-models/subscriptions",
+              "pricing-models/usage-based",
+              "pricing-models/credits",
+              "pricing-models/seat-based",
+              "pricing-models/hybrid"
             ]
           },
           {
-            "group": "Advanced",
+            "group": "API Usage",
             "pages": [
-              "advanced/credit-systems",
-              "advanced/usage-based-billing",
-              "advanced/seat-based-pricing",
-              "advanced/custom-pricing",
-              "advanced/metering-and-analytics"
+              "api-usage/authentication",
+              "api-usage/attach",
+              "api-usage/check",
+              "api-usage/track",
+              "api-usage/versioning",
+              "api-usage/idempotency"
             ]
           },
           {
-            "group": "Self-Hosting",
+            "group": "Features",
             "pages": [
-              "self-hosting/deployment",
-              "self-hosting/configuration",
-              "self-hosting/database-setup",
-              "self-hosting/environment-variables"
+              "features/webhooks",
+              "features/events",
+              "features/analytics",
+              "features/referrals",
+              "features/invoices"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "integration/stripe",
+              "integration/sdks",
+              "integration/react-components",
+              "integration/testing"
             ]
           }
         ]
@@ -68,115 +77,89 @@
           {
             "group": "Overview",
             "pages": [
-              "api/overview",
-              "api/authentication",
-              "api/errors",
-              "api/versioning",
-              "api/rate-limits"
-            ]
-          },
-          {
-            "group": "Core Endpoints",
-            "pages": [
-              "api/attach",
-              "api/check",
-              "api/track",
-              "api/cancel",
-              "api/checkout"
-            ]
-          },
-          {
-            "group": "Products & Plans",
-            "pages": [
-              "api/products/list-products",
-              "api/products/create-product",
-              "api/products/get-product",
-              "api/products/update-product",
-              "api/products/delete-product"
-            ]
-          },
-          {
-            "group": "Features",
-            "pages": [
-              "api/features/list-features",
-              "api/features/create-feature",
-              "api/features/get-feature",
-              "api/features/update-feature",
-              "api/features/delete-feature"
-            ]
-          },
-          {
-            "group": "Customers",
-            "pages": [
-              "api/customers/list-customers",
-              "api/customers/create-customer",
-              "api/customers/get-customer",
-              "api/customers/update-customer",
-              "api/customers/delete-customer"
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/errors"
             ]
           },
           {
             "group": "Billing",
             "pages": [
-              "api/billing/setup-payment",
-              "api/billing/billing-portal",
-              "api/billing/update-subscription",
-              "api/billing/preview-subscription"
+              "api-reference/billing/attach",
+              "api-reference/billing/checkout",
+              "api-reference/billing/cancel"
+            ]
+          },
+          {
+            "group": "Balances",
+            "pages": [
+              "api-reference/balances/check",
+              "api-reference/balances/track",
+              "api-reference/balances/set-usage",
+              "api-reference/balances/get-balance"
+            ]
+          },
+          {
+            "group": "Customers",
+            "pages": [
+              "api-reference/customers/create",
+              "api-reference/customers/get",
+              "api-reference/customers/update",
+              "api-reference/customers/list",
+              "api-reference/customers/delete"
+            ]
+          },
+          {
+            "group": "Products & Plans",
+            "pages": [
+              "api-reference/products/create",
+              "api-reference/products/get",
+              "api-reference/products/update",
+              "api-reference/products/list",
+              "api-reference/products/delete"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "api-reference/features/create",
+              "api-reference/features/get",
+              "api-reference/features/update",
+              "api-reference/features/list",
+              "api-reference/features/delete"
             ]
           },
           {
             "group": "Entities",
             "pages": [
-              "api/entities/list-entities",
-              "api/entities/create-entity",
-              "api/entities/get-entity",
-              "api/entities/update-entity",
-              "api/entities/delete-entity"
+              "api-reference/entities/create",
+              "api-reference/entities/get",
+              "api-reference/entities/update",
+              "api-reference/entities/list",
+              "api-reference/entities/delete"
             ]
           },
           {
-            "group": "Invoices",
+            "group": "Events",
             "pages": [
-              "api/invoices/list-invoices",
-              "api/invoices/get-invoice"
+              "api-reference/events/list",
+              "api-reference/events/get"
             ]
           },
           {
-            "group": "Events & Analytics",
+            "group": "Referrals & Rewards",
             "pages": [
-              "api/events/list-events",
-              "api/events/query-analytics",
-              "api/events/insights"
+              "api-reference/referrals/create",
+              "api-reference/referrals/get",
+              "api-reference/rewards/list",
+              "api-reference/rewards/redeem"
             ]
           },
           {
-            "group": "Rewards & Referrals",
+            "group": "Analytics",
             "pages": [
-              "api/rewards/list-programs",
-              "api/rewards/create-program",
-              "api/referrals/create-code",
-              "api/referrals/redeem-code"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "SDKs & Tools",
-        "groups": [
-          {
-            "group": "Client Libraries",
-            "pages": [
-              "sdks/javascript",
-              "sdks/typescript",
-              "sdks/react"
-            ]
-          },
-          {
-            "group": "Integrations",
-            "pages": [
-              "integrations/stripe",
-              "integrations/vercel",
-              "integrations/revenuecat"
+              "api-reference/analytics/insights",
+              "api-reference/analytics/query"
             ]
           }
         ]
@@ -185,36 +168,34 @@
   },
   "keyFeatures": [
     "Flexible pricing models (subscriptions, usage-based, credits, seat-based)",
-    "Three core API functions: attach, check, track",
-    "Real-time usage metering and limits",
-    "Automatic subscription management",
-    "Feature entitlements and access control",
-    "Credit and balance systems",
-    "Stripe integration for payments",
+    "Three-function API (attach, check, track)",
+    "Real-time usage tracking and limits",
+    "Stripe integration with webhook handling",
     "Usage analytics and insights",
     "Referral and rewards programs",
-    "Multi-tenant organization support",
-    "Self-hostable with Docker",
-    "React dashboard for management"
+    "Entity-based balances for multi-tenant apps",
+    "Automatic upgrade/downgrade flows",
+    "Custom pricing for enterprise customers",
+    "Self-hostable with Docker"
   ],
   "publicApiSurface": [
-    "POST /attach - Attach products to customers",
-    "POST /check - Check feature access and usage",
-    "POST /track - Track usage events",
-    "POST /cancel - Cancel subscriptions",
-    "POST /checkout - Create checkout sessions",
-    "POST /setup_payment - Setup payment methods",
-    "GET/POST /products - Manage products and plans",
-    "GET/POST /features - Manage features",
-    "GET/POST /customers - Manage customers",
-    "GET/POST /entities - Manage entities (seats)",
-    "GET /invoices - List invoices",
-    "POST /query - Query analytics",
-    "GET /insights - Get usage insights",
-    "POST /customers/{id}/billing_portal - Access billing portal",
-    "POST /subscriptions/update - Update subscriptions",
-    "POST /subscriptions/preview_update - Preview subscription changes",
-    "POST /reward_programs - Manage reward programs",
-    "POST /referrals - Manage referral codes"
+    "POST /v1/attach - Purchase or upgrade to a product/plan",
+    "POST /v1/check - Check customer access to products or features",
+    "POST /v1/track - Record usage events",
+    "POST /v1/checkout - Create Stripe checkout session",
+    "POST /v1/cancel - Cancel customer subscription",
+    "GET /v1/balances - Get customer balance information",
+    "POST /v1/customers - Create customer",
+    "GET /v1/customers/:id - Get customer details",
+    "PATCH /v1/customers/:id - Update customer",
+    "GET /v1/products - List products/plans",
+    "POST /v1/products - Create product",
+    "GET /v1/features - List features",
+    "POST /v1/features - Create feature",
+    "GET /v1/entities - List entities",
+    "POST /v1/entities - Create entity",
+    "GET /v1/events - List usage events",
+    "POST /v1/referrals - Create referral",
+    "GET /v1/insights - Get analytics insights"
   ]
 }
