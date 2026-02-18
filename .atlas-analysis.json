@@ -1,0 +1,183 @@
+{
+  "projectType": "api-service",
+  "projectName": "Autumn",
+  "projectDescription": "Open-source pricing and billing platform that sits between Stripe and your application",
+  "theme": "mint",
+  "primaryColor": "#FF6B35",
+  "lightColor": "#FF8C61",
+  "darkColor": "#E85A2A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "self-hosting"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/products-and-plans",
+              "concepts/customers",
+              "concepts/features-and-entitlements",
+              "concepts/pricing-models",
+              "concepts/webhooks"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/usage-based-billing",
+              "guides/credit-systems",
+              "guides/seat-based-pricing",
+              "guides/metering-usage",
+              "guides/managing-subscriptions",
+              "guides/custom-pricing",
+              "guides/checkout-flows"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdks/overview",
+              "sdks/javascript",
+              "sdks/react",
+              "sdks/rest-api"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Operations",
+            "pages": [
+              "api/core/attach",
+              "api/core/check",
+              "api/core/track",
+              "api/core/cancel",
+              "api/core/checkout"
+            ]
+          },
+          {
+            "group": "Customers",
+            "pages": [
+              "api/customers/create",
+              "api/customers/get",
+              "api/customers/update",
+              "api/customers/list",
+              "api/customers/billing-portal"
+            ]
+          },
+          {
+            "group": "Products & Plans",
+            "pages": [
+              "api/products/create",
+              "api/products/get",
+              "api/products/update",
+              "api/products/list",
+              "api/products/delete"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "api/features/create",
+              "api/features/get",
+              "api/features/update",
+              "api/features/list"
+            ]
+          },
+          {
+            "group": "Balances",
+            "pages": [
+              "api/balances/create",
+              "api/balances/update",
+              "api/balances/get"
+            ]
+          },
+          {
+            "group": "Entities",
+            "pages": [
+              "api/entities/create",
+              "api/entities/get",
+              "api/entities/list",
+              "api/entities/delete"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/events/list",
+              "api/events/get"
+            ]
+          },
+          {
+            "group": "Analytics",
+            "pages": [
+              "api/analytics/query",
+              "api/analytics/insights"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Additional Resources",
+            "pages": [
+              "resources/authentication",
+              "resources/rate-limits",
+              "resources/errors",
+              "resources/versioning",
+              "resources/changelog",
+              "resources/migration-guide"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/contributing",
+              "community/support",
+              "community/faq"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Usage-based billing with real-time metering",
+    "Credit systems and top-ups",
+    "Seat-based pricing with per-seat limits",
+    "Subscription management (upgrades, downgrades, cancellations)",
+    "Custom pricing for enterprise customers",
+    "Stripe integration with webhook handling",
+    "Embeddable checkout flows",
+    "Analytics and usage insights",
+    "Multi-tenancy support with organizations",
+    "Self-hosted or cloud deployment"
+  ],
+  "publicApiSurface": [
+    "POST /attach - Attach products to customers",
+    "POST /check - Check feature access and usage",
+    "POST /track - Record usage events",
+    "POST /cancel - Cancel subscriptions",
+    "POST /checkout - Create checkout sessions",
+    "POST /customers/* - Customer management",
+    "POST /products/* - Product and plan management",
+    "POST /features/* - Feature management",
+    "POST /balances/* - Balance operations",
+    "POST /entities/* - Entity management",
+    "POST /events/* - Event tracking",
+    "POST /query - Analytics queries",
+    "POST /insights/* - Usage insights"
+  ]
+}
