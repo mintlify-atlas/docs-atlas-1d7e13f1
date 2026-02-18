@@ -1,11 +1,11 @@
 {
   "projectType": "api-service",
   "projectName": "Autumn",
-  "projectDescription": "Open-source pricing and billing platform that sits between Stripe and your application",
-  "theme": "aspen",
-  "primaryColor": "#F97316",
-  "lightColor": "#FED7AA",
-  "darkColor": "#C2410C",
+  "projectDescription": "Open-source pricing and billing platform that layers between Stripe and your application",
+  "theme": "palm",
+  "primaryColor": "#FF6B35",
+  "lightColor": "#FFB4A2",
+  "darkColor": "#C44D26",
   "navigation": {
     "tabs": [
       {
